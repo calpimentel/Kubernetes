@@ -1,0 +1,16 @@
+
+Custom 
+---------------------------------
+	
+IAM-ROLE-EKS-ARN: arn:aws:iam::829060145781:role/ClusterEksRole
+SECURITY-GROUP-IDS:
+
+NODE-ROLE-ARN:
+
+LABEL-NODE-ROLE-ARN:
+
+USER-ARN:
+
+USER-ARN:
+
+1) 

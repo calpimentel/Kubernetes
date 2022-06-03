@@ -1,0 +1,33 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: hostname-v2
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: hostname-v2
+        version: v2
+    spec:
+      containers:
+      - image: rstarmer/hostname:v2
+        imagePullPolicy: Always
+        name: hostname
+      nodeSelector:
+        nodetype: generalpurpose
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: hostname-v2
+  name: hostname-v2
+spec:
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: hostname-v2
