@@ -1,0 +1,892 @@
+
+
+
+Loggin Monitoring
+---------------------------------------------------------------
+
+Checando logos
+
+	> cd /var/log/syslog
+	> cat /var/log/syslog
+
+
+Monitoring Kuberbetes Tools
+
+1) cAdvisor
+	Coleta metricas especificamente de containers individualmente
+
+2) Heapester
+
+	Usa cAdviser para coletar dados de um storage vindo do Kubernetes
+
+3) Prometheus
+
+	É um pull-based time-series capturador, storage, e alert service com integração com Kubernetes
+
+
+
+				CRIANDO O PROMETHEUS
+				---------------------
+
+
+EXERCISE FILE 01_03
+----------------------------
+
+1 - O Arquivo promoperator.yaml é o manisf mas importante no meio de todos os outros
+    O operator manisfest é a nova classe de controladores de ambientes kuberbetes que 
+    no tocante nos ajuda a roda estas ferramentas
+
+
+
+	- Neste .yaml o tipo é 
+		* Kind: ClusterrRoleBinding
+
+			Essa vai ser uma maneira de comunicar as configurações de Role policy
+			e ServiceAccount
+
+
+
+
+2 - No arquivo 01-promrbasac.yaml, vamos ter o Role base access
+
+	
+	- Neste o tipo é 
+		* Kind: ServiceAccount
+
+			Ele vai ser responsavel pelos acessos da ServiceAccount
+
+3) Vamos rodar esses dois .yaml files
+
+	> kubectl create -f 01-promrbac.yaml
+
+	serviceaccount "prometheus" created
+	clusterrole.rbac.authorizatio.k8s.io  "prometheus" created
+	clusterrolebinding.rbac.authorizatio.k8s.io "prometheus" created
+
+
+4) Vamos fazer o mesmo para o operator
+
+	> kubectl create -f 02-promoperator.yaml
+
+	clusterrole.rbac.authorizatio.k8s.io  "prometheus" created
+	clusterrolebinding.rbac.authorizatio.k8s.io "prometheus" created
+	serviceaccount "promethus-operator" created
+	deployment.extensions "prometheus-operator" created	
+
+5) Checando os pods
+
+	> kubectl get pods
+
+	NAME					READY	STATUS		RESTARTS	AGE
+	prometheus-operator-58774cdd8-st78t	1/1	Running		0		33s
+
+6) Vamos criar logs para o prometheus
+
+	> kubectl logs prometheus-operator-58774cdd8-st78t
+
+
+
+Agora no arquivo .yaml file: 03-prometheusalerts.yaml.
+
+	- Esse tipo é 
+	
+		* Kind: Prometheus
+
+			Esse tem a conta que é associado ao prometheus e paramentros para os nossos alerts
+
+1) Rodando o arquivo que criará o prometheus resources para alerts
+
+	> kubectl create -f 03-prometheusalerts.yaml
+
+	prometheus.monitoring.coreos.com "prometheus" created
+
+
+2) Isso criou recursos que vao trabalhar como prometheus operator, vamos checar os pods
+
+	> kubectl get pods
+
+	NAME					READY	STATUS		RESTARTS	AGE
+	prometheus-operator-58774cdd8-st78t	1/1	Running		0		3m
+	prometheus-prometheus-0			2/2	Running		0		33s
+	prometheus-prometheus-1			2/2	Running		0		33s
+
+
+
+
+
+
+Agora no arquivo .yaml file: 04-promservice.yml. Ele vai nos permitir expor os serviços para uso 
+
+	- Esse tipo é 
+	
+		* Kind: prometheus-main
+
+			Trata do load balancer que nesse caso usa o Amazon base kubernetes Environment
+			isso nos permitirá usar o prometheus web page UI
+
+
+1) Rodando o serviço do 04-promservice.yml
+
+	> kubectl create -f 04-promservice.yml
+
+	service "prometheus-main" created
+
+
+2) Checanod 
+
+	> kubectl get pods 
+
+	NAME					READY	STATUS		RESTARTS	AGE
+	prometheus-operator-58774cdd8-st78t	1/1	Running		0		3m
+	prometheus-prometheus-0			2/2	Running		0		33s
+	prometheus-prometheus-1			2/2	Running		0		33s
+
+
+
+
+
+Agora no arquivo .yaml file:05-alertmanagermain.yml
+	Esse arquivo é bem semelhante ao primeiro. É o gerenciamento dos alerts
+
+	- Esse tipo é 
+	
+		* Kind: Alertemanager
+
+
+1) Criando o serviço
+
+	> kubectl create -f 05-alertmanagermain.yml
+
+	alertmanager.monitoring.coreos.com "main" created
+
+2) Outra coisa que precisamos é criar mais um prometheus services de alertmanager que vai expor portas
+   e servico na web
+
+	> kubectl create -f 06-alertservice.yaml
+
+	service "alertmanager-main" created
+
+3) Agora o service de secrete key. Para isso vamos digitar o comando abaixo que vai pegar direto do 
+   arquivo alertmanager.yaml. Esse qarquivo é basicamente um arquivo de configuração para o alertmanager.
+   Ele cria um route simples para um job e cria um webhook para onde os alertas vao ser mandados
+   tambem configura a url para o webhook na porta 30500
+   
+
+	> kubectl create secret generic alertmanager-main --from-file-alertmanager.yaml
+
+		ou
+	> bash 07-alertmanager.sh
+
+	secrete"alertmanager-main" created
+
+4) Vamos checar tudo
+
+	> kubectl get pods
+
+	NAME					READY	STATUS			RESTARTS	AGE
+	alertmanager-main-0			0/2	ContainerCreating	0		1m
+	prometheus-operator-58774cdd8-st78t	1/1	Running			0		6m
+	prometheus-prometheus-0			2/2	Running			0		3m
+	prometheus-prometheus-1			2/2	Running			0		3m
+	
+
+
+
+
+
+
+EXERCISE FILE -> Ch02 -> 02_01
+----------------------------------------------------------------
+
+Depois que temos o prometheus criado, vamos começar a exportar alguns dados
+O default operator prometheus não monitora ninguem por default, nós podemos ver isso 
+logando no prometheus UI
+
+	Obs.: Se voce decidir usar o minikube ao inves do AWS (via kops) ou 
+	      outro Cloud driven Kubernetes, voce vai da mesma forma precisar mudar as configurações de
+  	      load balancer para o NodePort no service descriptions, e você vai precisar usar uma URL 
+ 	      diferente para comunicar com o Prometheus
+
+	      O seguinte comando irá mudar de load balancer para NodePort no manifest do service
+  	      isso podemos constatar no type: field
+	
+			grep Load *yml | cut -d: -f1 | xargs sed -i '' -e s/LoadBalancer/NodePort/
+
+	      Note que quando a porta "9090" é referenciada, ou a descoberta é definida. que informações
+	      sao beneficiadas. No minilube case. o prometheus UI vai ser o minikube IP, 
+	      que pode ser discoberto como:
+
+			minikube ip
+
+	      e no statically defined (nodePort em o .yml definitions)
+	      como 30990. O seguinte comando deve gerar um HTTP://URL para 
+   	      usar em um browser:
+
+			echo "http://$(minikube ip):30990/"
+
+
+Para logar no prometheus UI, primeiro vamos fazer vamos checar nossos serviços
+
+	> kubectl get srv
+
+	NAME			TYPE		CLUSTER-IP	EXTERNAL-IP		PORT(S)			AGE
+	alertmanager-main	LoadBancer	100.71.199.193	ad0320fdf6846...	9093:32204/TCP		4m
+	alertmanager-operator	ClusterIP	None		<none>			9093/TCP,6783/TCP   	5m
+	Kubernetes		ClusterIP	199.64.0.1	<none>			443/TCP			2h
+	prometheus-main		LoadBalancer	100.67.94.174	ab6e301466846...	9090:31548/TCP		5m
+	alertmanager-operaed	ClusterIP	None		<none>			9090/TCP		6m
+
+7) Olhando os serviços acima, o que procuramos vai está no load balancer. vamos pegar nele o nome do host
+
+	> kubectl get svc -o yaml prometheus-main | grep hostname
+
+	- hostname: ab6e30146684611e8a795020f9657383-1391445762.us-east-1.elb.armazonaws.com
+
+
+8) Para acessar o prometheus dashboard no Amazom AWS basta copiar o nome do host acima e acrescentar a porta 9090
+   Ao primeiro momento ele nao vai ter nenhum tipo de dados, e vamos ter que adicionar alguns serviços
+
+	ab6e30146684611e8a795020f9657383-1391445762.us-east-1.elb.armazonaws.com:9090
+
+
+Outros services nos .yaml files
+
+	03-promnodes.yml
+		* O arquivo 03-promnode.yaml, é um arquivo para um ferramenta em especifico, o node exporter
+		  que exportar o dados underline node dos sistema, que sao na maioria os dados contenarized
+		  tambem são adicionados alguns componetes para se comunicar com o monitoramento e APIs
+
+	04-promstate.yal
+		
+	05-promkubeapism.yml
+		Esses controlers nao precisam de outras controlers adicionando porque
+		ja possoe caracteriscas associadas a ele que se adequal ao prometheus para falar com 
+		eles
+	06-promkubeletsm.yml
+		Similar ao anterior, em termos de controlers
+	07-promkubeschedsm.yml
+
+	08-promkubectrlsm.yml
+
+	09-promnodedesm.yaml
+
+	10-promstateesm.yml
+
+
+
+9) Vamos começar adicionando alguns outros control
+
+	> kubectl create -f 01-promkubecontrol.yml
+	
+	service "kube-controller-manager-prometheus-discovery" created
+
+10) Vamos fazer o deploy tambem do serviço de schedule
+
+	> kubectl create -f 02-promkebusched.yml
+
+	service "kube-scheduler-prometheus-discovery" created
+
+11) Agora o node service
+
+	> kubectl create -f 03-promnodes.yml
+
+	service "kube-scheduler-prometheus-discovery" created
+	deamonset.extensions "node-exporter" created
+
+12) Vamos agora para o prometheus state
+
+	> kubectl create -f 04-promstate.yal
+	
+	serviceaccount "kube-state-metrics" created
+	clusterrole.rbac.authorization.k8s.io "kube-state-metrics" created
+	clusterrolebinding.rbac.authorization.k8s.io "kube-state-metrics" created
+	role.rbac.authorization.k8s.io "kube-state-metrics-resizer" created
+	rolebinding.rbac.autorization.k8s.io "kube-state-metrics" created
+	deployment.extensions "kube-state-metrics" created
+	service "kube-state-metrics" created
+
+13) Vamos começar o serviço de monitoramento against APIs
+
+	> kubectl created -f 05-promkubeapism.yml
+
+	servicemonitor.monitoting.coreos.com "kube-apiserver" created
+
+14) Monitoramento contral o Kubelet
+
+	> kubectl created -f 06-promkubeletsm.yml
+
+	servicemonitor.monitoring.coreos.com "kubelet" created
+
+16) Moniroamento against control service
+
+	> kubectl created -f 07-promkubectlsm.yml
+
+	servicemonitor.monitoring.coreos.com "kube-controller-manager" created
+
+17) Monitoramento against scheduler
+
+	> kubectl create -f 08-promlubeschedsm.yml
+	
+	servicemonitor.monitoring.coreos.com "kube-scheduler" created
+
+18) Monitoramento contra o Nodesm
+
+	> kubectl create -f 09-promnodesm.yml
+
+19) Monitoramento contra o state
+
+	> kubectl create -f 10-promstatesm.yml
+
+	servicemonitor.monitoring.coreos.com "kube-state-metrics" created
+
+
+20) Podemos fazer um checklist nos serviços
+
+	> kubectl get servicemonitor
+
+	NAME				AGE
+	Kube-apiservice			1m
+	Kube-controller-manager 	1m
+	Kube-scheduler			1m
+	Kube-state-metrics	       30s
+	Kubelet				1m
+	node-exporter		       49s
+	
+
+21) Podemos ver os pods com os sistemas que foram laucheted
+
+	> kubectl get pods
+
+	NAME					READY		STATUS		RESTARTS	AGE
+	alertmanager-main-0			2/2		Running		0		12m
+	alertmanager-main-1			2/2		Running		0		9m
+	alertmanager-main-2			2/2		Running		0		2m
+	node-exporter-fxbhb			2/2		Running		0		2m
+	node-exporter-k2rnl			2/2		Running		0		2m
+	node-exporter-kqtxc			2/2		Running		0		2m
+	node-exporter-lc8pl			2/2		Running		0		2m		
+	node-exporter-qzgdm			2/2		Running		0		2m
+	node-exporter-sq8cl			2/2		Running		0		2m
+	prometheus-operator-5c8774cdd80-st78t	2/2		Running 	0		16m
+	prometheus-prometheus-0			2/2		Running		0		14m
+	prometheus-prometheus-1			2/2		Running		0		14m
+
+22) Olhando os processos do sistema
+
+	> kubectl get pods -n kube-system
+
+
+
+
+
+
+EXPLORANDO AS METRICAS
+
+EXERCISE FILE -> 02_02
+
+1) Algumas variaveis de metricas
+
+	# We find an interesting cAdvisor provided metric
+	container_cpu_user_seconds_total
+
+	# We do a little filtering to remove some obvious non-pod data
+	container_cpu_user_seconds_total{pod_name!=""}
+
+	# Then we change the filter to tune in to a single pod
+	container_cpu_user_seconds_total{pod_name="prometheus-prometheus-1"}
+
+
+2) Agora que ja adicionamos os serviços no prometheus, vamos voltar no AWS AMAZON
+
+	ab6e30146684611e8a795020f9657383-1391445762.us-east-1.elb.armazonaws.com:9090
+
+3) Vamos procurar pelo primeiro serviço
+
+	container_cpu_user_seconds_total
+	
+		Clicar no botão; EXECUTE
+
+4) Na consulta poderá aparece um monte de pod_name='', podemos filtrar nossa consulta exluindo os pod
+   com nomes vazios
+
+	container_cpu_user_seconds_total{pod_name!=''}
+
+5) Podemos por exemplo colocar na consulta um nome especifico para o pod
+ 
+	container_cpu_user_seconds_total{pod_name="prometheus-prometheus-1"}
+
+
+
+
+
+
+EXERCISE FILE -> Ch03 -> 03_01
+--------------------------------------------------------------------
+
+Quando ligamos o Prometheus Envoronment, tambem ligamos um conjunto de Server Constructs e 
+Server Managers que na verdade conectam os serviços todos, vamos descrever como estas peças
+se interligam e se conectam e trocam dados na interface do prometheus
+
+Segue os arquivos que usamos previamente para criar estes recursos:
+
+	* 01-promkubecontrol.yml
+	* 07-promkubectrlsm.yml
+
+
+O primeiro(01-promkubecontrol.yml) é um server definition. Tudo que fazemos neste arquivo é 
+expor API endpoint e dando uns selector parameters especificos
+------------------------------------------------------------------------
+01-promkubecontrol.yml
+------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: kube-system
+  name: kube-controller-manager-prometheus-discovery
+  labels:
+    k8s-app: kube-controller-manager
+spec:
+  selector:					-->Selector spect define o componete selector que liga o inspector ao sistema
+    k8s-app: kube-controller-manager
+  type: ClusterIP
+  clusterIP: None
+  ports:					--> Aqui dizemos que queremos expor API metrics na porta 10252, com isso kubernets containers e pods podem se expostos a metrics interfaces
+  - name: http-metrics				    (continuamdo:) Vai ser por aqui que prometheus vai conseguir fazer pesquisas 	
+    port: 10252
+    targetPort: 10252
+    protocol: TCP
+
+
+
+------------------------------------------------------------------------
+07-promkubectrlsm.yml
+------------------------------------------------------------------------
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kube-controller-manager
+  labels:
+    k8s-app: kube-controller-manager
+spec:
+  jobLabel: k8s-app
+  endpoints:
+  - port: http-metrics				--> Aqui a porta http que sera amarada ao job label do k8s app
+    interval: 30s
+  selector:
+    matchLabels:
+      k8s-app: kube-controller-manager		--> Aqui vemos o serviços que nos conecta com as APIs para metricas
+  namespaceSelector:
+    matchNames:
+    - kube-system
+
+
+
+Na Interface AWS AMAXON do Promethes, podemos procurar pelos serviços que foram adicionados
+
+	
+	ab6e30146684611e8a795020f9657383-1391445762.us-east-1.elb.armazonaws.com:9090
+
+		service_adds
+		
+		EXECUTE
+
+
+
+EXERCISE FILE -> Ch03 -> 03_02
+--------------------------------------------------------------------
+
+Com o prometheus pention application, ha alumas metricas que são tangiveis 
+ha alguma core application como kubelte API servers e muitas outras que não 
+que não tem metrics enabled em prometheus
+
+Quando nós incialmente configuramos esse prometheus environment, na verdade nós 
+habilitamos o equivalente a um sidcar application
+Um sidcar em um kubernetes world é um simples container que vive em um pod que 
+possibilita a adição de mais services
+
+No nosso caso nos vamos olhar o a nivel de dados do sistema export equivalente ao sidcar
+
+os arquivos dessa seção:
+
+	Nesses arquivos temos os dados que necessitamos para habilitar a interação entre 
+   	os recursos do sidcar e o deployment do sidcar resource com a integração do sistema
+	do proprio prometheus
+
+	03-promnode.yml
+	09-promnodesm.yml
+
+
+03-promnode.yml
+-------------------------------------------------------------------------
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-exporter
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-exporter
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding			---> Tipo RoleBinding
+metadata:
+  name: node-exporter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-exporter
+subjects:
+- kind: ServiceAccount
+  name: node-exporter
+  namespace: default
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet					---> Aqui um serviço importante, é onde configuramos o Deamonset rodando
+metadata:
+  labels:
+    app: node-exporter
+  name: node-exporter
+spec:
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: node-exporter			--> Aqui temos o nodeexport running
+      name: node-exporter
+
+    spec:
+      serviceAccountName: node-exporter		
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      hostNetwork: true
+      hostPID: true
+      containers:				--> No container environment nós definimos o sidcar application para interagir com a min application
+      - image: quay.io/prometheus/node-exporter:v0.15.2 
+        args:					--> Aqui vamos rodar um conjunto de componentes embebidos no sidcar
+        - "--web.listen-address=127.0.0.1:9101"
+        - "--path.procfs=/host/proc"
+        - "--path.sysfs=/host/sys"
+        name: node-exporter
+        resources:
+          requests:
+            memory: 30Mi
+            cpu: 100m
+          limits:
+            memory: 50Mi
+            cpu: 200m
+        volumeMounts:
+        - name: proc
+          readOnly:  true
+          mountPath: /host/proc
+        - name: sys
+          readOnly: true
+          mountPath: /host/sys
+      - name: kube-rbac-proxy
+        image: quay.io/brancz/kube-rbac-proxy:v0.2.0		--> Aqui temos uma seção de imagem
+        args:
+        - "--secure-listen-address=:9100"
+        - "--upstream=http://127.0.0.1:9101/"
+        ports:
+        - containerPort: 9100
+          hostPort: 9100
+          name: https
+        resources:						-->Aqui vamos export o conjunto de resource para applicação interagir com estes resources
+          requests:
+            memory: 20Mi
+            cpu: 10m
+          limits:
+            memory: 40Mi
+            cpu: 20m
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+      volumes:
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
+---
+apiVersion: v1						-> A segunda coisa que acontece aquie é pegar estes resouces
+kind: Service						   e torna-los discoverables ao system no kubernetes environment
+metadata:
+  labels:						-> para fazer isso vamos terceteza que colocamos uma label nesses serviços
+    app: node-exporter
+    k8s-app: node-exporter				-> Especificamente vamos olhar essa label k8s-app que vai nos comunicar com outro serviço
+  name: node-exporter					   que será o service monitor que vai está no proximo arquivo de dados .yml
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: https
+    port: 9100
+    targetPort: https
+  selector:
+    app: node-exporter
+
+		
+Esse proximo arquivo é menor e nos cria um service Monitor
+
+09-promnodesm.yml
+-------------------------------------------------------------------------
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor				--> Vamos expor o Service Monitoring
+metadata:
+  name: node-exporter
+  labels:
+    k8s-app: node-exporter			
+spec:
+  jobLabel: k8s-app				--> Aqui temos o nosso Job Label
+  selector:					--> A peça mais critica e importante aqui é o nosso selector
+    matchLabels:
+      k8s-app: node-exporter			--> Aqui vamos vamos dizer como falar com o prometheus environment 
+  namespaceSelector:
+    matchNames:
+    - default
+  endpoints:					--> Aqui vamos falar especificamente com o endpoint
+  - port: https					    o endpoint é parte do service definition que temos no outro arquivo acima e nos
+    scheme: https 				    na verdade estamos conectando todos esses recursos juntos
+    interval: 30s
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      insecureSkipVerify: true
+
+
+
+Apos isso feito, vamos poder ver esses serviços se conectando no nosso dashboard no AWS AMAZON
+e vamos ver todos os serviços que estão sendo monitorados pelo prometheus enviroment
+incluindo o node exporter(que é o serviço que conectar a aplication e o sidcar que expoe esses resourcers services
+que conecta com o prometheus que por sua vez consegue ver as metricas)
+
+	No menu do dashboard vamos selecionar 
+
+		Status -> Service Discovery
+	
+		--> 
+			Service Discoveryy
+				* default/kube-apiserver/0
+				* defauly/kube-controller-manager-0
+				* defauly/kube-example-app/0
+				* defauly/kube-schedulle/0
+				* defauly/kube-state-metric/0
+				* defauly/kube-state-metric/1
+				* defauly/kubelet/0
+				* defauly/kubelet/1
+				* defauly/kube-exporter/0
+
+			default/kube-apiservr/ - show more
+			default/kube-controller-manager/0 - show more
+			default/kube-example-app/0 - show more
+			default/kube-scheduler/0 - show more
+			default/kube-state-metrics/0 - show more
+			default/kube-state-metrics/1 - show more
+			default/kubelet/0 - show more
+
+Se voce descer nos tipos de metricas fornecidas pelo node export vamos encontrar os seguintes tipos:
+
+	node_cpu
+	node_disk_bytes_read
+	node_disk_bytes_written
+	node_disk_io_now
+	node_disk_io_times_ms
+	node_disk_io_times_weighted
+	node_disk_read_times_ms
+	node_disk_reads_completed
+	node_disk_reads_merged
+	node_disk_sectors_merged
+	node_disk_sectors_read
+	node_disk_write_times_ms
+	node_disk_writes_merged
+	node_disk_writes_completed
+	node_disk_writes_available_bits
+	node_entropy_available_bits
+	.
+	.
+	.
+
+
+  
+EXERCISE FILE -> 03_03
+
+Como temos muitos dados de metricas, a primeira coisa que vamos fazer é filtrar esses dados,
+
+1) Checando essa metrica no AWS AMAZON prometheus console
+
+	container_cpu_user_seconds_total
+
+
+2) Podemos filtrar mais ainda por um pod em especifico, mas nesse comando vamos ver outros containers no 
+   mesmo pod que fazem parte do mesmo serviço
+
+	container_cpu_user_seconds_total{pod_name="prometheus-prometheus-1"}
+
+
+3) Vamos colocar mais um filtro, que será a feixa de intervalo de 5minutos
+
+	container_cpu_user_seconds_total{pod_name="prometheus-prometheus-1"}{5m}
+
+
+4) Podemos manipular os dados, por exemplo podemos ver a taxa de mudança
+
+	rate(container_cpu_user_seconds_total{pod_name="prometheus-prometheus-1"}{5m})
+
+5) Vamos ver o a soma desses dados combinados em um data point, mas ao inves de observar os dados 
+   a nivel de containers, vamos ver os dados agrupados e combinados a nivel de pod
+
+	sum(rate(container_cpu_user_seconds_total{pod_name="prometheus-prometheus-1"}[5m]))
+
+
+
+EXRCISE FILE -> 04_01
+
+
+1) No AWS AMAZON prometheus UI, vamos copiar a metrica e colar na caixa de pesquisa
+   
+
+	demo_api_http_requests_in_progress
+
+	codlab_api_http_requests_in_preogress(endpoint="web",instance="110.96.3.8080",job="exmple-app"
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
