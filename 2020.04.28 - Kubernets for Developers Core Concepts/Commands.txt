@@ -1,0 +1,167 @@
+
+
+MiniKube
+-------------------------------
+
+	https://github.com/kubernetes/minikube
+
+Docker Desktop
+-------------------------------
+	
+	https://www.docker.com/products/docker-desktop
+
+
+Installing and Running Kubernetes
+-------------------------------
+
+	https://kind.sigs.k8s.io
+
+
+Kubeadm
+--------------------------------
+
+	https://kubernetes.io/docs/reference/setup-tools/kubeam/kubeandm
+
+
+
+  
+
+
+COMMANDS
+---------------------------------------------
+
+	> Kubectl version 					--> Checa a versão
+
+	> kubectl cluster-info					--> View cluster information
+
+	> kubectl get all					---> Retrieve information about Kubernetes Pods, Deployments, Services, and more
+
+	> kubectl run [container-name] --image=[image-name]	---> A forma simple de criar um Development para um Pod
+
+	> kubectl port-forward [pod] [ports]			---> Publicando a porta para acesso externo
+
+	> kubectl expose ...					---> Expoe a porta para um Development/Pod
+
+	> kubectl creat [resource]				---> Cria ou modifica um resource
+
+	
+
+Enabling the Web UI Dashboard
+-----------------------------------------------
+
+  - https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard
+
+  - Web UI dashboard provides a user interface to view Kubernetes resources.
+
+	Steps to enables the UI Dashboard:
+
+		* Kubectl apply [dashboard-yaml-url]
+
+		* Kubectl describe secret -n kube-system	----> Revela o Token que foi gravado em alguma área
+
+		* Locate the kubernetes.io/service-account-token and copy the token
+
+		* Kubectl proxy 
+
+		* Visit the dashboard
+
+
+    - Rodar o comando para instalar roles, security users and a lor staff
+
+	> kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta1/aio/deploy/recommended.yaml
+
+  
+    - Vamos rodar o comando para describer o token
+
+	> kubectl describe secret -n kube-system
+	-----> 
+		.
+		.
+		.
+		Type: kubernetes.io/service-account-token		---> esse é o que queremos
+		
+		Data:
+		====
+		ca.crt	    1025 bytes
+		namespace:  11 nytes
+	 	token:	    eyJhHCciOiJSU.............................................
+                            .
+			    .										---> Precisamos copiar esse token inteiro
+			    .
+			    _KRQ	
+
+    - Vamos agora rodar o comando proxy
+
+	> kubectl proxy
+	
+	+ kubectl proxy
+	Starting to server on 127.0.0.1:8001
+
+	isso vai fazer o Dashboard disponivel em:
+
+		https://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+
+			-> (x) Token
+				-> Colar o token
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

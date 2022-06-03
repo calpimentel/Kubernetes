@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment            # Deployment é uma indicação de replicas set
+metadata:
+  name: my-nginx
+  labels:
+    app: my-nginx
+spec:
+  replicas: 2             # Aqui há um numero fixo de replicas set
+  selector:               # Aqui vamos Selecionar labels filtrando pelos labels my-nginx 
+    matchLabels:
+      app: my-nginx
+  template:
+    metadata:
+      labels:
+        app: my-nginx     # No template temos a label chamada my-nginx
+    spec:                 # spec vai ser nosso pod template
+      containers:
+      - name: my-nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:        # Restrinção de recursos memória e cpu
+          limits:
+            memory: "128Mi" #128 MB
+            cpu: "200m" #200 millicpu (.2 cpu or 20% of the cpu)
+
+
+# Rodando
+#  > kubctl create -f nginx.deployment.yml --save-config
+#  > kubectl get all
+
+# Filtrando por labels
+#  > kubrctl get deployments -l app=,y-nginx
+
+# Scale
+# > kubectl scale -f nginx.deployment.yml --replicas=4
+
+# Deletando o deployment
+# > kubectl delete -f nginx.deployment.yml
+
