@@ -1,0 +1,750 @@
+
+
+Microservice 101
+--------------------------------------
+
+Beneficios do Microserviço
+------------------------------------------------------------
+
+	- Liberdade para criar, gerenciar e fazer deplor individual de componentes
+
+	- Reduzir a superficie da ária = facil de fazer o plug in de Continous Integrations
+
+	- Habilita fault tolerance e fault isolation
+
+
+DEMONSTRAÇÃO 
+============================
+
+- Construir um microservice-based application usando kubernetes como a microservice platform
+
+- Evitando gargalos com scaling
+
+	* Por exemplo: autenticadno e usando gerenciamento de token
+
+		+ Construindo login/token management
+
+		+ APIs como um separador de serviços
+
+		+ Vender independentimente
+
+
+Deployment: Beneficios
+--------------------------
+
+	- Pegar seus updates para produção mais rapidamente
+
+	- Risco de liberação tem menor mudanças de configurações
+
+	- Pronto para rodar como algumas novas idéias como blue-green ou A/B deployment
+
+
+Twelve-Factor App
+--------------------------
+
+	- Source: https://12factor.net
+
+	- Initially proposed to build SaaS apps para Heroku
+
+	- Principles translate well to cluod and container native applications
+
+
+
+Principle 1: Codebase
+---------------------------
+
+	- Codebase deve ser rastreado em version control e deve ter muitos deploys
+
+		* Muito comum: A maioria das pessoas já usam source control
+
+		* da mesma forma tem em muitos environments
+
+Principle 2: Dependencies
+--------------------------
+
+	- Dependencias são explicitamente declaradas e isoladas
+
+		* Ao invés de copia/colar,considerar usar funções reusavéis, ou compartilhar como biblioteca
+
+		* Usar ferramnta de gerenciamento de dependencias para compartilhar bibliotecas, como Mavem para Java, Gemfiles para Ruby, etc.
+
+
+
+Principle 3: Configuration 
+----------------------------
+
+	- Store configuration in the environment
+
+		* Add configuration via enviroment variables ou config files
+
+
+Principle 4: Backing Services
+--------------------------------
+
+	- Treat backing services as an attached resource
+
+		* Treat service the same way,wheter it's an internal database ou third-party service
+
+		* Should be easy to deploy and change
+
+Principle 5: Build, Release, Run
+---------------------------------------------
+
+	- Build, deploy and Run
+
+		* Always have a build and deploy strategy
+
+		* Build strategies for separayed builds, versioning of running systems, and rollback
+
+Principle 6: Process
+----------------------------------------------
+
+	- Execute the application as um stateless process
+
+		* Sticky sessions need to revisited and re-implemented
+
+		* Might be challenging in large enterprise with architecture already in place
+
+
+Prince 7: Port Binding
+----------------------------------------------
+
+	- Expose services via port binfings
+
+
+Principles 8, 9 and 10
+----------------------------------------------
+
+	- Concurrency: Scale out with process model
+
+	- Disposability: Quick application startup and shutdown times
+
+	- Dev/prod parity: Application in treated the same way in dev, starting, and production
+
+
+Principles 11 and 12
+----------------------------------------------
+
+Log Management				Admin Task
+- Treated as an event stream		- Treated the same way like the rest of the application
+
+					- Are allowed to run against a released version 
+
+
+Implementando os Twelve-factor principles in Kubernetes
+-----------------------------------------------------------------------
+
+	- Agrupando Arquitetura 
+	
+		* Basic building blocks architectures
+
+		* Deployment patterns
+
+		* Runtime patterns
+
+	
+Building Blocks
+------------------------------------------
+
+	- Covers the initial concerns
+
+		* Codebase
+
+		* Dependencies
+
+		* Dev/staging/production parity
+
+		* Admin processes
+
+Deployment Patterns
+-------------------------------------------
+
+	Covers Patterns aroung applications deployments
+
+	- Applications configurations
+
+	- Build, releasem run
+
+	- Processes 
+
+	- Port bind
+
+
+
+
+
+
+CODEBASE WORKFLOW
+--------------------------------------------
+
+1. Push code to your source control.
+
+2. Automated build is kicked off to build and run tests agains code.
+
+3. Build container image; push to image repository.
+
+
+
+IMAGE REPOSITORY
+--------------------------------------------
+
+	- Stores your code in an image
+
+	- Need to decide earky on 
+
+	- Follow your code company guidelines
+
+Application Dependencies
+---------------------------------------------
+
+	- Applications modeled in Kubernetes as Deployments and pods
+
+	- Single pod can have many containers inside
+	
+	- Commonly seen in Kubernetes: sidecar pattern
+
+
+
+DEV vs PROD in Kubernetes
+----------------------------------------------
+
+	For applications
+
+	- Small footprint: different namespaces with different credentials for dev, staginf, and production
+
+	- Large footprint: unique Kubernetes installation for dev, staging, and production
+
+
+Adimin Processes
+-------------------------------------------------
+
+- Admin process containers tagged in a similar way to the running application
+
+- Containers run as Kunernetes jobs/chron job
+
+- Also run as a separate deploymente
+
+
+
+
+DEPLOYMENT PATTERS
+---------------------------------------------------
+
+	Applications Cinfiguration in Kubernetes
+
+	- Two ways to store configs
+
+		* ConfigMaps: for generic information (example: metadata, version)
+	
+		* Secrete: for sensitive data (example: passwords)
+
+	- Loaded into the pod via
+	
+		* Environment variables
+
+		* Files
+
+	
+Running in Kubernetes
+-------------------------------------------------
+
+	- High-level constructs to run containers
+
+	- Deployments 
+
+	- Deployments, DeamonSets, Replicas
+
+	Aditional tooling:
+	- Package management provided by Helm
+
+	- Add revision control
+
+
+
+Statelessness in Kubernetes
+----------------------------------------------------
+
+	- Translated to Deployments and pods
+
+	- Deployments comprised of ReplicasSets, which are a collection of one or more pods
+
+	- 
+Word on StatefulSet
+----------------------------------------------------
+	- Tipocally used to create persistent storage systems like a MySQL shard
+
+
+Port Bindings
+---------------------------------------------------
+
+	- Translated to Deployments and pods
+	
+	- Depliyments comprised of ReplicasSetss, which are a collections of one or more pods
+
+	- Containers are implementations in pods
+	
+	- Comunnicate ro each other via well-defined ports
+
+
+
+
+Associeting Resources in Kubernetes
+----------------------------------------------------
+
+	- Everithing is treated as a service, and configuration are storage in a ConfigMap or Secret
+
+
+
+SCENARIO: REPLACE A LINK TO A DATABASE
+----------------------------------------------------
+1)  Create new database; ensure it's online and ready to accept connections.
+
+2) Update configurations storage in the ConfigMaps or Secrets.
+
+3) Kill the pods that were communicating with the old database
+
+When Kuberbetes starts up the new pods, the new pods automatically pick up the new conficuration, and you'll be using the new service
+
+If a pod is talking too much load or is reciving a lot of requestes, it's easy to scale the numbers of pods in kubernetes by adding more to the replica set.
+
+Scalling Kubernetes to handle more traffic is one of the stranghts of the platform.
+
+
+
+
+DISPOSABILITY
+-----------------------------------------------------
+
+	- the ability yo maximize robusteness with fast startup and graceful shutdown
+
+	
+CONTAINERS
+----------------------------------------------------
+
+	- Start up fast and run efficiently
+
+	- Have all required tooling built inside of the container image
+
+	
+CONTAINERS TO PODS TO REPLICAS
+------------------------------------------------------
+
+	- Kubernetes managers your containers in pods, which are managed with replicaSets
+
+	- If one of the pods goes offline, the ReplicaSet will automatically start up a new pod to take its place
+
+
+
+Loggin 
+------------------------------------------------------
+
+	- Treat logs are streams: executions enviroments handles the logs
+
+	- Common to use a log routrt (Beats/Fluentd) ro save the logs to a service (Elasticsearch/Splunk)
+
+	- Kubernetes males this process easy
+
+
+
+Let's deconstruct a monolith and rebuild our app with everithing we've learned so far.
+
+
+
+
+
+						A P P L I C A T I O N 
+					       ----------------------
+
+Ecommerce Exemplo
+----------------------------------------
+	Proposito:
+	    
+		Construir um Catalog: Onde muitos clientes vejam os produtos e as especificações
+
+			* Ver a lista de produtos correntes
+
+			* Entender suas especificações
+
+			* Savar produtos em uma lista de desejos que habilite team collaboration
+
+			* Pegar um cota para a lista de desejos ou através do processo de compra
+
+MODULO CORE
+-----------------------------------------
+
+1) User Mode: Responsável por gerenciamento de usuários, login e gerenciamento de profile
+
+2) Catalog Module: Lista de produtos em uma catalogo de companias
+
+3) Wish List Module: API que os clientes usam para criar uma view de seus produtos da lista de desejos
+
+
+
+
+
+No modo monolitico
+
+ 	- Teremos um unico WAR file, e um ou mais JAR files que prover todos as funcionalidades core,
+
+	- Tambem terá um web tier comum para cuidar dos web requestes e web responses
+
+
+No modo: Soup-Base Aerchiteture
+
+	- Breaking This up
+
+		Isto vai nos dá uma application simples dividida em 3 microserviços
+
+			* Auth
+	
+			* Wish List
+
+			* Catalog application
+
+
+
+
+
+
+
+
+PRIMEIRO DEPLOYMENT
+---------------------------------------------------
+
+EXERCISE FILE -> 03_03
+
+
+1) Vamos criar varias aplicações com o auxili do arquivo wishlist-deployment-alternate.yaml
+
+	> kubectl apply -f wishlist-deployment-alternate.yaml
+	> kubectl get deployments
+	> kubectl get pods
+
+
+
+
+CONFIGURATION INFORMATION
+----------------------------------------------------
+
+	- Should live outside of the app
+
+	- Implementado usando ConfigMaps em Kubernetes
+
+	- Pode ser passado como uma variável de ambiente
+
+	- Pode ser isado com um mount volume 
+
+EXERCISE FILE -> 03_04
+
+1) Para esse exemplo nós temos um simples configmap - wishlist-deployment-simple.yaml
+
+	> kubectl apply -f wishlist-deployment-configmap-simple.yaml
+	configmap "log-config" created
+	deployment "wishlist-deployment" created
+	service "wishlist-service" created
+	
+2) Checando os pods
+
+	> kubectl get pods
+
+	NAME					READY	STATUS	RESTART	AGE
+	wishlist-deployment-8fd5584790-29r64	3/3	Running	0	33s
+	wishlist-deployment-8fd5584790-bqq8w	3/3	Running	0	33s
+	wishlist-deployment-8fd5584790-xmdxl	3/3	Running 0	33s
+
+3) Vamos pegar o prinmeiro pod e executar em wishlist container como bash
+
+	> kubectl exec -it wishlist-deployment-8fd5584790-29r64 -c wishlist bash
+        / # env | grep LOG_LEVEL
+		LOG_LEVEL=debug
+
+
+Este foi em casos simples, mas em cenarios bem maiores. Java por exemplo tem muitas propriedades
+
+
+CENARIOS MAIORES - wishlist-deployment-configmap-advanced.yaml
+-----------------------------------------------------------------------
+
+Java tem muitas propriedades e podem ser inclusas no arquivo config
+
+	# Configmap (Step 1: Create it)
+	apiVersion: v1
+	kind: ConfigMap
+	metadata:
+	  name: log-config
+	data:
+	  log.properties: |
+	    # Root logger option
+	    log4j.rootLogger=DEBUG, stdout, file
+	    # Redirect log messages to console
+	    log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+	    log4j.appender.stdout.Target=System.out
+	    log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+	    log4j.appender.stdout.layout.ConversionPattern=%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n
+	    # Redirect log messages to a log file, support file rolling.
+	    log4j.appender.file=org.apache.log4j.RollingFileAppender
+	    log4j.appender.file.File=log4j-application.log
+	    log4j.appender.file.MaxFileSize=5MB
+	    log4j.appender.file.MaxBackupIndex=10
+	    log4j.appender.file.layout=org.apache.log4j.PatternLayout
+	    log4j.appender.file.layout.ConversionPattern=%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n
+	---
+
+
+1) Vamos fazer o deploy deste cenário mais complicado
+
+	> kubectl apply -f wishlist-deployment-configmap-advanced.yaml
+
+2) Vamos olhar os pods que foram criados
+
+	> kubectl get pods
+
+	NAME					READY	STATUS	RESTART	AGE
+	wishlist-deployment-8fd5584790-29r64	3/3	Running	0	33s
+	wishlist-deployment-8fd5584790-bqq8w	3/3	Running	0	33s
+	wishlist-deployment-8fd5584790-xmdxl	3/3	Running 0	33s
+
+3) Vamos executar o container auth em bash, que é a aplicação de autenticação dentro do pod wishlist
+
+	> kubectl exec -it wishlist-deployment-8fd5584790-29r64 -c auth bash
+
+
+4) Para olhar a nosso variavel de ambient env em funcionamento
+
+	> kubectl exec -it wishlist-deployment-8fd5584790-29r64 -c auth bash
+	/ # cd /var/wishlist
+	/ # cat /var/lib/wishlist/log.properties
+
+
+
+
+
+
+
+
+Fazendo o deploy das secretes
+----------------------------------------------
+EXERCISE FILE -> 03_05
+ 	wishlist-deployment-secret.yaml
+
+Nessa etapa vamos criar uma secret que pode ser referenciada por uma application via variavel env
+Também vamos criar uma secret que pode ser referenciada via volume mounted file
+
+1) Fazendo o deploy
+
+	> kubectl apply -f wishlist-deployment-secrete.yaml
+
+2) Nesse tipo de config .yaml temos o tipo "kind" que é igual a secrete. No mesmo arquivo vamos 
+   encontrar a connection-string que possue uma chave. Vamos copiar essa chave
+   Noso objetivo é obter a verdadeira chave secret a partir dessa connection-string e para fazer isso 
+   vamos executar o seguinte comando com ajuda do echo e a chave copiada e logo em seguida filtrando
+   para a decriptação
+
+	> echo c2VydmVyPTEyNy4wLjAuMTt1aWQ9cm9vdDtwd2Q9MTIzNDU7ZGF0YWJhc2U9dGVzdA==  | base64 --decode
+	-->
+	   server=127.0.0.1;ui=root;pwd=1234;database=test
+
+3) Vamos olhar os pods e pegar um como exemplo
+
+	> kubectl get pods
+
+	NAME					READY	STATUS	RESTART	AGE
+	wishlist-deployment-8fd5584790-29r64	3/3	Running	0	33s
+	wishlist-deployment-8fd5584790-bqq8w	3/3	Running	0	33s
+	wishlist-deployment-8fd5584790-xmdxl	3/3	Running 0	33s
+
+4) Vamos pegar um deles, pode ser o primeiro e executar o container nele o container auth
+
+
+	> kubectl exec -it wishlist-deployment-8fd5584790-29r64 -c auth
+
+5) Checando a variavel de ambiente
+
+	> env | grep MUSQL_CONNECTION_STRING
+	---> 
+		MYSQL_CONNECTION_STRING=server127.0.0.1;ui=root;pwd=1234;database=test
+
+6) Podemos observar que temos a conection-string dentro da nossa pasta
+
+	> cd /etc/mysql-volume
+	> ls -al
+
+		data/connection-string	
+
+	> cat connection-string
+
+		server=127.0.0.1;ui=root;pwd=1234;database=test
+
+
+
+
+CONTAINER PROBE
+----------------------------
+
+EXERCISE FILE -> 03_06
+
+Muitas vezes um container depende da inicialização de outro antes de ser iniciado. No mundo kuberbetes
+a unica maneira de se fazer isso é utilizando o livenees probe
+
+Livennes probe geralmente são uzados no deployments onde vamos ter varios containers rodando em 
+um single deployment
+
+
+A dois tipos de containers probes que podemos usar:
+
+	- Liveness probe:
+
+		* Indica se o Container está rodando. Se o liveness probe fails, o kubelet mata o container e o 
+                  em questão é submetido a restart policy. 
+		* Se o container não prover um liveness probe, o state default é Success
+
+	- ReadnessProbe:
+
+		* Indica se o Container está pronto para o servico de requestes. 
+		  Se o readiness probe fails, o endpoint controller remove o Pod's IP address
+                  do endpoint de todos os Services que estão no pod;
+
+		* O default state do readiness antes de delay inicial é failure. Se o Container não 
+ 		  prover um deadiness probe. O default state é success.
+
+
+ 
+1) Neste exemplo temos um wishlist-deployment-liveness.yaml com uma seção livenessProbe
+
+    .
+    .
+    .
+    spec:
+
+	.
+	.
+	.
+
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8080 #Name or port number
+          initialDelaySeconds: 5			---> O tempo de espera para o probe tomar decisões
+          timeoutSeconds: 1				---> O tempo timeout
+
+
+2) Vamos fazer o deploy 
+	
+	> kubectl apply -f wishlist-deployment-liveness.yaml
+
+	deployment "wishlist-deployment" created
+	service "wishlist-service" created
+
+
+3) OS pods
+
+	> kubectl get pods
+
+
+	NAME					READY	STATUS	RESTART	AGE
+	wishlist-deployment-8fd5584790-29r64	3/3	Running	0	33s
+	wishlist-deployment-8fd5584790-bqq8w	3/3	Running	0	33s
+	wishlist-deployment-8fd5584790-xmdxl	3/3	Running 0	33s
+
+
+4) Vamos pegar a descricao de um dos pods especificamente o deployment
+
+	> kubectl describe deployment wishlist-deployment
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
