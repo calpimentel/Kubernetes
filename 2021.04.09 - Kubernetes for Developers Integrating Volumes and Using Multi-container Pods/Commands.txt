@@ -1,0 +1,1654 @@
+
+
+
+
+GIT
+https://github.com/nigelpoulton/ps-vols-and-pods
+
+
+Course Key Subjects 
+-----------------------------------------------------------------
+	- Kubernetes Storage: The Big Picture
+
+	- Decoupling Application & Data Lifecycles
+
+	- The Kubernetes Persistent Volume
+
+	- Subsystem
+
+	- The Container Storage Interface (CSI)
+
+	- Hands-on: Static Provisioning
+
+	- Hands-on: Dynamic Provisioning
+
+	- Advanced Volume Features
+
+
+Stateful application
+	- An application that creates and saves data that need to be kept.
+
+
+Kubernetes Persistent Volume Subsystem
+	- Decouples data from application Pods and Containers, and abstracts implementation detail.
+
+
+	- PV Persistent Volume tipos de plug que se conecta com a storage system de sua preferencia
+
+	- PVC Persistent Volume Claim.Para o pode usar o PV precisa referencia a PVC object para acessa-lo
+	
+
+
+Interligando as peças
+
+- Aqui temos o nosso PV object em um volume externo de 50G dentro do cluster
+
+ps.pv.yaml
+-----------------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ps-pv
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: ps-fast
+  capacity:
+    storage: 50Gi
+  persistentVolumeReclaimPolicy: Retain
+  gcePersistentDisk:
+    pdName: ps-vol
+
+
+- Em seguida um outro yaml temos o objet PVC que é ligado ao PV pelo nome definido em storageClassName = ps-fast
+
+ps.pvc.yaml
+-----------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ps-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: ps-fast
+  resources:
+    requests:
+      storage: 50Gi
+
+
+- Em seguida o POD usa a referencia do PV e cria um volume a partir dele através do PVC.
+  Uma vez que um POD faz uma chamada de referencia a um PVC ninguem mais pode
+  reclama-lo para si, mas todos os outros PODs podem acessá-los.
+
+
+ps.pod.yaml
+-----------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: first-pod
+spec:
+  volumes:
+    - name: fast50g				-> Nome do volume
+      persistentVolumeClaim:	
+        claimName: ps-pvc			-> Nome da classe storage do PV e PVC
+      containers:
+      - image: ubuntu:latest
+        name: ctr1
+	command:
+	- /bin/bash
+	- "-c"
+	- "sleep 60m"
+        volumeMounts:
+	- mountPath: /data
+	  name: fast50g				-> Novamente definição do volume e nome
+
+
+Em suma o Kubernetes Persistent Volume Subsistem tem 3 principais objetos que permitem fazer volumes externos para PODs Contaiers
+
+	- PV  PersistentVolume (v1)
+	- PVC PersistentVolumeCLaim (v1)
+	- SC  storageClass (storage/storage/k8s.io/v1)
+
+
+
+
+
+
+
+Container Storage Interface (CSI)
+----------------------------------------------------------------------------------------
+
+	https://github.com/container-storage-interface
+
+Kubernetes implementa seu proprio flavour  of CSI, que vai ser uma layer abstrata entre nosso volume e o Resource externo
+	obs: já algo implementado com o kubernetes
+
+	https://github.com/kubernetes-csi
+
+
+
+
+STATIC PROVISIONING
+----------------------------------------------------------------------------------------
+
+Exemplo em GKE (Google Kubernete Engine)
+
+	Requisito:
+		Volume criado no GCP de 20GB, criados para PODs e Vols course
+		nome: ps-vol
+		Type: SSD persistent disk
+
+	Objetivo: mapear esse volume externo no Kubernetes
+
+	
+		
+Folder 03 - Resources
+======================
+
+ps-pv.yml
+----------------------------------------------
+apiVersion: v1
+kind: PersistentVolume					----> Definição de uso de PV
+metadata:
+  name: ps-pv						----> O nome do PV
+spec:
+  accessModes:
+  - ReadWriteOnce					----> Access mode, ReadWriteOnce = ROW, isto significa que este PV pode ser claim uma unica vez por um POD  
+  storageClassName: ps-fast
+  capacity:
+    storage: 50Gi
+  persistentVolumeReclaimPolicy: Retain			----> Qunado o volume é liberado pelo cliente, Retain mantém o volume externo e nenhum outro pode fazer bind 
+  gcePersistentDisk:  					----> gcePersistentDisk é nome do plugin que estamos usando
+    pdName: ps-vol  
+
+
+obs: Tambem há outros modos além do RWO
+
+	RWO = Read-write once
+	RWM = Read-write many
+	ROM = Read-only many
+
+	Nem todo tipo de volume aceita RWM e ROM, 
+	Geralmente tipos como file system volume aceitam estes dois
+	Porém, é sempre bom pesquisar a documentação para saber se o 
+	plugin permite ou não
+
+	Para saber mais sobre volumes: 
+	https://kubernetes.io/docs/concepts/storage/volumes/#types-of-volumes
+
+	Outros Tipos:
+		gcePersistentDisk
+		aswElasticBlockStore
+		azureDisk
+		azureFile
+		nfs
+		vsphereVolume
+
+
+
+
+ps-pvc.yml
+-----------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim				-----> Definindo o PVC através do kind
+metadata:
+  name: ps-pvc						-----> O nome do PVC
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: ps-fast				-----> stotageClassName
+  resources:
+    requests:
+      storage: 50Gi					-----> Capacidade, a capacidade do PVC tem que bater com o PV, pode ser maior, mas nunca menor
+
+
+
+ps-pod.yml
+------------------------------------------------
+apiVersion: v1
+kind: Pod						-----> Agora o tipo POD
+metadata:
+  name: first-pod					-----> O nome 
+spec:
+  volumes:
+    - name: fast50g					-----> O Nome do POD
+      persistentVolumeClaim:				
+        claimName: ps-pvc				-----> O nome do PVC que será claimed por este POD
+  containers:	
+  - image: ubuntu:latest
+    name: ctr1
+    command:
+    - /bin/bash
+    - "-c"
+    - "sleep 60m"
+    volumeMounts: 					-----> Na seção do container o volume é montado
+    - mountPath: /data
+      name: fast50g					-----> O nome do PVC ao qual o bound será feito
+
+
+
+
+
+1 - Fazendo o Deploy do PV volume
+
+	> kubectl apply -f  .\ps-pv.yaml
+	> kubectl get pv ps-pv
+
+
+2 - Fazendo o Deploy do PVC
+
+	> kubectl -f .\ps-pvc.yml
+
+	> kubectl get pvc ps-pvc
+
+	NAME	STATUS	VOLUME	CAPACITY	ACCESS MODE	STORAGECLASS	AGE
+	ps-pvc	Bound	ps-pv	50Gi		RWO		ps-fast		14s
+
+
+	> kubectl get pv ps-pv
+
+	NAME	STATUS	CAPACITY	ACCESS MODE	RECLAIM POLICE	STATUS	CLAIM		STORAGECLASS	REASON 	AGE
+	ps-pv	Bound	50Gi		RWO		Retain		Bund	default/ps-pvc	ps-fast			14s
+
+
+3 - Fazendo o deploy do POD
+
+	> kubectl -f .\ps-pod.yml
+
+
+
+
+
+
+
+STATIC PROVISIONING
+----------------------------------------------------------------------------------------
+
+	- Aqui temos dois aspectos de criação
+		- Dynamic volume creatio
+		- differet Classs/tiers of volumes
+
+ps-pvc.yml
+ps-pod.yml
+
+ps-sc.yml
+-------------
+kind: StorageClass						-----> Aqui é uma storageClass
+apiVersion: storage.k8s.io/v1					-----> Tambem faz parte da storageClass subgroup API
+metadata:
+  name: ps-gcp-fast						-----> O nome com iniciais ps=pluralsight  gcp=google cloud provider  fast=fast storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"		-----> Define que qualquer PV sem classe especifica vai ser Classe Default
+provisioner: kubernetes.io/gce-pd				-----> Cloud Provider google compute volume assistent
+volumeBindingMode: WaitForFirstConsumer				-----> Bind Mode, esperar pelo primeiro consumer
+parameters:							-----> Parametros especificos para seu plugin
+  type: pd-ssd							----->	é um persister disk solid type
+  replication-type: none					----->	sem replicação, especifico do google
+
+
+		Obs: parameters para AWS
+
+			parameters:							
+		  	  type: io1								
+		  	  iopsPerGB: "10"
+		  	  encrypted: "true"					
+
+		   Há outros parametros tambem, como ScaleIO, exemplo:
+
+			parameters:							
+			  gateway: http://scaleio-prod1:443/api
+			  system: scaleio-prod1
+			  storagePool: fast-db
+			  storageMode: ThinProvissioned
+			  ReadOnly: false
+
+		  Todas as configurações vão depender do que o seu plugin suporta através do seu backend
+
+
+
+ps-scpod.yml
+--------------
+apiVersion: v1
+kind: PersistentVolumeClaim					-----> Define que o POD será o claimer
+metadata:		
+  name: pvc-htmlvol						-----> Nome do PVC = pvc-htmlvol				
+spec:
+  storageClassName: "ps-gcp-fast"				-----> Nome da storageClass = "ps-gcp-fast"
+  accessModes:							-----> Tudo aqui nessa seção é definição, o volume não de fato criado aqui
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 25Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sc-pod
+  labels:
+    app: stg
+spec:
+  volumes:							-----> Criação do volume
+    - name: htmlvol
+      persistentVolumeClaim:
+        claimName: pvc-htmlvol
+  containers:
+    - name: main-ctr
+      image: nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:						-----> Aqui o container monta o volume.Este volume vai ser usado tambem pelo container abaixo
+        - mountPath: "/usr/share/nginx/html"
+          name: htmlvol
+    - name: helper-ctr
+      image: ubuntu
+      command:
+      - /bin/bash
+      - "-c"
+      - "sleep 60m"
+      volumeMounts:						---> O segundo container usa o mesmo volume. RWO permite varios container compartilhar volumes, somente no mesmo POD
+      - mountPath: /data
+        name: htmlvol
+---
+apiVersion: v1
+kind: Service							---> Serviço para expor na internet
+metadata:
+  name: lb
+spec:
+  selector:
+    app: stg
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+
+
+
+
+1 - Provisionando a storageCLass (sc)
+	
+
+	> kubectl get sc	
+
+		NAME			PROVISSIONER		AGE
+		stadard (default)	kubernetes.io/age-pd	9h
+	
+
+	> kubectl apply -f ps-sc.yml
+
+	        storageclass.storage.k8s.io/ps-gcp-fast created
+
+	> kubectl get sc			
+	
+
+		NAME			PROVISSIONER		AGE
+		ps-gcp-fast		kubernetes.io/age-pd	5s
+		stadard (default)	kubernetes.io/age-pd	9h
+
+
+2 - Para editar a standard class e tirar a marcação de default=true em anotations. Podemos até substituir o "true" por "", isso
+    vai fazer default a outra storageClass
+
+	> kubectl edit sc standard
+
+	> kubectl get sc			
+	
+
+		NAME			PROVISSIONER		AGE
+		ps-gcp-fast (default)	kubernetes.io/age-pd	35s
+		stadard 		kubernetes.io/age-pd	9h
+
+
+3 - Fazendo o deploy do container POD
+
+	> kubectl apply -f .\ps-scpod.yml
+	> kubectl get pv
+	> kubectl describe pod sc-pod					---> Podemos pegar o IP e testar no browse, mas o volume está vazio
+
+4 - executando o container e populando o volume
+
+	> kubectl exe -it  sc-pod -c  helper-ctr /bin/bash
+	rootsc-pod:/# echo 'Pluralsight FTW!!'  > ./data/index.html
+
+
+
+--------------------------------
+ADVANCED VOLUME FEATURES
+--------------------------------
+
+
+rawblock.yml
+-----------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim					-----> Aqui um PVC
+metadata:
+  name: pvc-block
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Block						-----> Essa simples linha indica que fará um bind a um Block Volume, Un volume não formatado
+  storageClassName: ps-gcp-fast
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: block-pod
+spec:
+  volumes:
+    - name: block-vol
+      persistentVolumeClaim:
+        claimName: pvc-block
+  containers:
+    - name: block-ctr
+      image: ubuntu
+      command:
+      - /bin/bash
+      - "-c"
+      - "sleep 60m"
+      volumeDevices:						-----> Aqui ao invés de montar direto no file system de um volume vai montar em um Device
+        - devicePath: /dev/block
+          name: block-vol
+      imagePullPolicy: IfNotPresent
+
+
+
+1 - Vamos provisionar o volume acima
+
+	>  kubectl apply -f .\rawblock.yml
+	>  kubectl get pods --watch
+	
+	# checando o que há no POD
+
+	> kubectl exec block-pod -- ls -l /dev
+
+	---->	block
+		core
+		fd
+		full
+		mqueue
+		null
+		ptmx
+		pts
+		random
+		shm
+		stderr
+		stdin
+		termination-log
+		tty
+		urandom
+		zero
+
+
+
+
+
+------------------------------------------------------------------------------
+CLONES VOLUMES
+------------------------------------------------------------------------------
+
+origin-pod.yml
+--------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: origin-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: clone-sc
+  resources:
+    requests:
+      storage: 10Gi
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: origin-pod
+spec:
+  volumes:
+    - name: origin-vol
+      persistentVolumeClaim:
+        claimName: origin-pvc
+  containers:
+    - name: main-ctr
+      image: ubuntu
+      command:
+      - /bin/bash
+      - "-c"
+      - "sleep 60m"
+      volumeMounts:
+      - mountPath: /data
+        name: origin-vol
+
+
+
+clone-pod.yml
+--------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: clone-pvc				----> Clone PVC
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: clone-sc			---> Storage class name, qualquer dado aqui vai ser replicado no clone
+  resources:
+    requests:
+      storage: 10Gi
+  dataSource:
+    kind: PersistentVolumeClaim
+    name: origin-pvc				----> PVC origem de onde vai ser clonado
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: clone-pod				----> Pod Clone
+spec:
+  volumes:
+    - name: clone-vol				----> Definindo o volueme daquele PVC
+      persistentVolumeClaim:
+        claimName: clone-pvc			----> Ao inves de criar um Volume vazio, vai criar um clone do volume 
+  containers:
+    - name: clone-ctr
+      image: ubuntu
+      command:
+      - /bin/bash
+      - "-c"
+      - "sleep 60m"
+      volumeMounts:				----> Montado em um container
+      - mountPath: /data
+        name: clone-vol
+
+
+
+1 - Vamos fazer o deploy do original
+
+	> kubectl apply -f .\origin-pod.yml
+
+2 - Populando o original
+
+	> kubectl exec -it origin-pod /bin/bash
+	root@origin-pod:/# echo 'I am the original'  > /data/file
+	root@origin-pod:/# 
+	root@origin-pod:/# sync
+	root@origin-pod:/# exit
+
+
+3 - Fazendo o deploy do Volume Clone
+
+	> kubectl apply -f .\clone-pod.yml
+
+	> kubectl exec clone-pod -- cat /data/file
+ 		---> 
+			I am the original
+
+	> kubectl exec origin-pod -- cat /data/file
+ 		---> 
+			I am the original
+
+
+
+
+--------------------------------------------------------------------------------
+CHAPTER 04
+--------------------------------------------------------------------------------
+
+
+POD
+	Metadatas in a container:
+		- Probes
+		- Affinites
+		- Restart policies
+		- Termination control
+
+	- Usualmente todo container tem schedule  no mesmo cluster e compartilham os mesmos resources
+	- Mas tambem POD é um ambiente executável, que tem network stack, share memory e Disk Volume
+	- Eles valam uns com os outros através de networks ou volumes
+
+	
+Some Help
+
+	> kubectl explain pods --recursive
+	> kubectl explain pods.spec.restartPolicy
+
+
+
+Multi-Container Pods
+--------------------------------------
+
+	- Sidecar Pattern
+	  Um exemplo comum é de um sidecar container que atualiza conteudo para um webserver
+ 	  Um sidecar adiciona funcionalidades como encriptar trafégo entre PODs, expor telemetria e metricas
+	  e a melhor coisa sobre service mesh é que permite tudo isso acontecer sem nem mesmo saber nada a respeito
+
+				Web 		Sidecar
+			     Container	       Container
+				|		   |
+				|		   |
+				+-------HTML-------+
+
+	- Adapter Pattern
+	  Nesse método o container helper pega um conteudo não padronizado e arruma em um padrão 
+	  de saida para um sistema externo
+
+				Web 		Sidecar
+			     Container	       Container-------------------------> External system
+				|		   |
+ 		  [Non-standard output]    [Standardise output]
+				|		   |
+				+-------HTML-------+
+	
+	- Ambassador Pattern
+	  Nesse padrão o helper container quebra conectividade com o mundo externo
+	  Vamos supor que o web server faz tudo a nivel de localhos e o helper container
+	  faz um proxy com o mundo externo
+
+								Send to
+						           https://extapi:9001
+			    Main App 		Ambassador---------------------------------> External system
+				|		   |
+                         localhost:80         Listen on localhost:80
+				|		   |
+				+-----+___+___-----+
+					 +
+	- Init Container
+	  É um tipo especial de container que garante o start e finish anter do main container subir
+	  Geralmente preparamos esse container para preparar o environment
+
+			       Main 			Init
+			       App	       	      Container
+				|		   	|
+				|		   	|
+				+---->Data set     <----+
+				
+
+
+INIT CONTAINER PATTERN
+--------------------------------------------------------
+
+- É um tipo de container que vai rodar uma unica vez e depois é descartado
+  seu funcionamento vai ocorrer anter do main container entrar em funcionamento
+  A sua principal função pde ser setar permissões, definir o ambiente
+  ou preparar o dataset
+
+
+  	* Uma das pode se um init container que clona o codigo num repo
+
+
+			       Main 			Init
+			       App	       	      Container	<---------- Git Repo
+				|		   	|
+				|		   	|
+				+---->  Data set   <----+
+				
+
+  	* Outro exemplo seria um container que checa se uma api está respondendo
+          a partir do momento que a API está aberta ele some e a API se repota
+ 	  ao main container
+
+			1) Init entra em funcioamento
+
+			      	 			Init
+			       		       	      Container	<---------- {API}
+				 		   	|
+				 		   	|
+				  	Data set   <----+
+
+			2) O init e derrubado apos realizar as tarefas
+				
+			       Main 			
+			       App <--------------------------------------- {API}
+				|		   	
+				|		   	
+				+---->  Data set  
+
+
+Um exemplo:
+
+init-pod.yml
+--------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ps-init
+  labels:
+    app: initializer
+spec:
+  initContainers:					---> Declarado dessa forma vai rodar antes do main container
+  - name: init-ctr					---> O nome começa por init, e o que ele vai fazer é iniciar o DNS services
+    image: busybox
+    command: ['sh', '-c', 'until nslookup pluralsight-ftw; do echo waiting for pluralsight-ftw service; sleep 1; done; echo Service found!']
+  containers:
+    - name: web-ctr					--> Main container
+      image: nigelpoulton/web-app:1.0
+      ports:
+        - containerPort: 8080
+
+
+1 - Antes de rodar vamos só confirmar se existe algum serviço
+	
+	> kubectl get svc
+
+2 - Rodando os contaiers, o init-cr vai rodar em loop a cada segundo procurando pelo DNS, enquanto não acha
+    reposta vai imprimindo textos, podemos rastrear isso pelo log -c  = especifica o container em específico
+    muito útil quando se deseja levantar um serviço após outro ser levantado
+
+	> kubectl apply -f init-pod.yml
+	> kubectl logs ps-init -c init-cr
+	> kubectl get pods --watch
+	> kubectl describe pod ps-init
+
+
+
+
+
+RESOURCE REQUESTS AND LIMITS
+----------------------------------------------------------------------------
+
+- Limitação dos recurso como memória e cpu etc.
+
+  - Mantelos low para init containers
+  - Apenas o maior init container é contado
+
+Outro exmplo:
+
+
+init-git.yml
+-------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: git-syncer
+  labels:
+    app: git-syncer
+spec:
+  initContainers:							-----> Init Container
+  - image: k8s.gcr.io/git-sync:v3.1.5					-----> Baseado no public container sync registry
+    name: init-sync-ctr
+    volumeMounts:							-----> Monta o mesmo volume compartilhado abaixo e os 2 containers vão ter acesso ao mesmo volume compartilhado
+    - name: html
+      mountPath: /tmp/git						-----> GIT
+    env:								-----> O primeiro manda clonar esse repo
+    - name: GIT_SYNC_REPO
+      value: https://github.com/nigelpoulton/ps-sidecar.git
+    - name: GIT_SYNC_BRANCH						----> Logo abaixo a instrução da clonagem no master
+      value: master
+    - name: GIT_SYNC_DEPTH
+      value: "1"
+    - name: GIT_SYNC_DEST						----> O destino no volume html no diretorio do volume acima que está compartilhado tambem abaixo
+      value: "html"
+    - name: GIT_SYNC_ONE_TIME
+      value: "true"
+  containers:								-----> Main Container Nginx
+  - image: nginx
+    name: web
+    volumeMounts:							-----> Volume compartilhado			
+    - name: html
+      mountPath: /usr/share/nginx
+  volumes:								-----> Definindo um volume com um diretorio vazio
+  - name: html
+    emptyDir: {}
+---
+apiVersion: v1
+kind: Service								-----> Serviço de loadbalancer
+metadata:
+  name: git-syncer
+spec:
+  selector:
+    app: git-syncer
+  ports:
+    - port: 80
+  type: LoadBalancer
+
+
+
+1 - Fazendo o deploy
+
+	> kubectl apply -f init-git.yml
+	> kubectl get pods --watch
+	> kubectl get svc --watch				----> Pegar o IP
+
+
+2 - 
+
+
+
+
+
+SIDECAR CONTAINER
+------------------------------------------------------------------------------
+
+
+sidecar.yml
+-------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: git-syncer
+  labels:
+    app: git-syncer
+spec:
+  containers:
+  - image: nginx
+    name: web
+    volumeMounts:
+    - name: html
+      mountPath: /usr/share/nginx/
+  - image: k8s.gcr.io/git-sync:v3.1.5
+    name: init-sync-ctr
+    volumeMounts:
+    - name: html
+      mountPath: /tmp/git
+    env:
+    - name: GIT_SYNC_REPO
+      value: https://github.com/nigelpoulton/ps-sidecar.git
+    - name: GIT_SYNC_BRANCH
+      value: master
+    - name: GIT_SYNC_DEPTH
+      value: "1"
+    - name: GIT_SYNC_DEST
+      value: "html"
+  volumes:
+  - name: html
+    emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: git-syncer
+spec:
+  selector:
+    app: git-syncer
+  ports:
+  - port: 80
+  type: LoadBalancer
+
+
+1 - Fazendo o deploy
+	
+	> kubectl get pods --watch
+	> kubectl get svc  --watch
+
+
+
+
+
+
+ADAPTER PATTERN
+-----------------------------------------------------------------
+
+	- Adapter usar um container helper para formatar dados
+
+	- Um bom exemplo é o prometheus que colhe metricas e uma 
+	  container adapter formata os dados
+
+				Web    <---------------- Adapter <------------------------- Central log monitoring tool
+			     Container	        	Container
+				
+ 		       [Non-standard output]      [Exposes Standardise output]
+
+
+NGINXADAPTER CONTAINER
+===================================================
+https://hub.docker.com/r/nigelpoulton/nginxadapter
+
+Slightly modified NGINX image for use in Pluralsight courses.
+
+Base NGINX (FROM nginx) modified to enable the /nginx_status endpoint for scraping 
+by the official nginx/nginx-prometheus-exporter image to prepare metrics for Prometheus.
+
+default.conf
+
+server {
+  listen       80;
+  server_name  localhost;
+  location / {
+      root   /usr/share/nginx/html;
+      index  index.html index.htm;
+  }
+  error_page   500 502 503 504  /50x.html;
+  location = /50x.html {
+      root   /usr/share/nginx/html;
+  }
+  location /nginx_status {						---> Uma pequena modificação para expor nginx metrics
+    stub_status;
+    allow 127.0.0.1;  #allow requests on localhost
+    deny all;   #deny everything else
+  }
+}
+
+
+Dockerfile
+
+# Build from the latest official NGINX image
+FROM nginx
+
+LABEL maintainer="Nigel Poulton nigelpoulton@hotmail.com @nigelpoulton"
+
+# Update packages and install curl 
+RUN apt-get update
+RUN apt-get install -y curl
+
+# Add the default.conf file that enables the /nginx_status endpoint
+COPY default.conf /etc/nginx/conf.d/default.conf
+
+
+				
+				
+
+adapter.yml
+--------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web
+spec:
+  containers:
+  - name: web-ctr							---> Main container web-ctr
+    image: nigelpoulton/nginxadapter:1.0				---> Baseado nessa imagem nginxadapter, O prometheus não pode le as metricas do nginx
+    ports:
+    - containerPort: 80
+  - name: transformer							---> Baseado na imagem Prometheus Exporter Nginx, aqui vai criar um endpoint que o prometheus possa lÊ
+    image: nginx/nginx-prometheus-exporter
+    args: ["-nginx.scrape-uri","http://localhost/nginx_status"]
+    ports:
+    - containerPort: 9113						--> A porta de exposição para prometheus le as metricas
+
+
+1 - Deploy
+
+	> kubectl apply -f adapte.yml
+
+2 - Executando o container
+
+Modificação do container que pode ser acessada
+-----------------------------------------------------------
+  location /nginx_status {						
+    stub_status;
+    allow 127.0.0.1;  #allow requests on localhost
+    deny all;   #deny everything else
+  }
+}
+
+	> kubectl exec -it web /bin/bash
+	root@web:/    curl localhost/nginx_status			--> Chamando a modificação do container varias vezes dá resultados de metricas diferetnes
+	server accepts handled requests					
+	2 2 2 
+
+	root@web:/    curl localhost/nginx_status			
+	server accepts handled requests					
+	3 3 3 
+
+	root@web:/    curl localhost/nginx_status			
+	server accepts handled requests					
+	4 4 4 
+
+
+	root@web:/    curl localhost:99113/metrics			--> se tentar acessar o localhos daqui desse container, as metricas sao obtidas de formato desordenado		
+	# TYPE nginx_connections_waiting guage
+	nginx_connection_waiting 0
+	.
+	.
+	# TYPE nginx_connections_writig gauge
+	nginx_connection_writing 1
+	.
+	.
+	TYPE nginx_up gauge
+	nginx_up 1
+
+
+
+
+
+
+
+AMBASSADOR PATTERN
+-----------------------------------------------------------------
+
+- Toda vez que voce faz uma conexão com o container o Ambassado faz um conexao com a APIexterna
+
+
+external.yml
+----------------------------------------------------------------
+apiVersion: v1
+kind: Pod							---> este pod é uma app-externa que o Ambassado POD vai fazer uma conexao
+metadata:							     Lembrado que este nao é o ambassado e apenas uma API externa
+  name: external-app
+  labels:
+    app: ambassador
+spec:
+  containers:
+  - name: nginx-outside
+    image: nigelpoulton/nginx-outside:1.0
+    ports:
+    - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ps-ambassador						---> Tudo que vamos nos preocupar é este Web Server que vai está acessível ao Ambassado
+spec:
+  selector:
+    app: ambassador
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+
+
+
+
+
+1 - Fazendo o deploy
+
+	> kubectl apply -f external.yml
+	> kubectl get svc --watch			---> Pegar o IP e testar no browse
+
+
+Aqui é o nosso main app
+
+
+ambassadoe-app.yml
+-------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ambassador-app
+spec:
+  containers:							---> Este POD container é o nosso main app
+  - name: main-app						--> Ele vai estabelece conexao com o localhost 
+    image: nigelpoulton/curl:1.0				--> O curl vai mandar requests para o localhost pelaporta 9000
+    command: ["sleep", "3600"]					--> Essa linha aqui mantem rodando simulando commandos dando post logon na porta 9000
+  - name: ambassador						--> Aqui é o Ambassador Container e ele realmente se envolve com o exterior
+    image: nigelpoulton/nginx-ambassador:1.0			--> Container
+
+
+
+Aqui a Configuração do container Ambassador
+----------------------------------------------------------------------------------------------------------------------
+https://hub.docker.com/r/nigelpoulton/nginx-ambassador
+
+Slightly modified NGINX image for use in Pluralsight courses.
+Base NGINX (FROM nginx) modified to run as a proxy sending traffic to a custom back-end at ps-ambassador.
+The container will fail if it doesn't find a K8s Service with the name "ps-ambassador".
+
+nginx.conf
+
+worker_processes 1;
+worker_rlimit_nofile 4096;
+events {
+  worker_connections 512;
+}
+http {
+  upstream backend {
+    server ps-ambassador;					---> Aqui o proxy definido neste backend "ps-ambassador"
+  }
+  server {
+    listen 9000;      						---> Escutar na porta 9000
+    location / {
+      proxy_pass http://backend;
+    }
+  }
+}
+
+
+O esquema funciona assim:
+
+A Main App não se importa com o endereço e manda requisao para o localhost na porta 9000
+
+O Ambassador POD ouve na porta 9000 local e atua como PROXY reenviando a requisição para 
+O servido do back-end ps-ambassador na porta 80
+
+
+
+								Send to
+						           https://ps-ambassador:80
+			    Main App 		Ambassador---------------------------------> External API back-end
+				|		   |
+                         localhost:9000         Listen on localhost:9000
+				|		   |
+				+-----+___+___-----+
+					 +
+1 - Fazendo o deploy
+
+	> kubectl apply -f ambassador-app.yml
+
+2 - Executando
+
+	> kubectl exec -it ambassador-app /bin/bash
+	root@ambassador-app:/# 
+	root@ambassador-app:/# curl localhost:900		---> Curl  pode simular conexao com o servidor pela porta 9000
+								     e vai retornar o html do servidor, especificamente index.html
+	root@ambassador-app:/# exit
+
+
+
+Kubernetes AuthN and AuthZ
+-----------------------------------------------------------------------------------------
+
+- User
+	- Use são autenticados com API Server
+	- Ha tambem alguns certificados que o Kubectl use para comandar 
+
+	> kubectl config view
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: DATA+OMITTED						
+    server: https://kubernetes.docker.internal:6443
+  name: docker-desktop
+contexts:
+- context:
+    cluster: docker-desktop
+    user: docker-desktop		
+  name: docker-desktop
+current-context: docker-desktop
+kind: Config
+preferences: {}
+users:
+- name: docker-desktop
+  user:											--> C4ertificates
+    client-certificate-data: REDACTED
+    client-key-data: REDACTED
+root@DESKTOP-A0US7BH:~#
+
+	Todos esses dados ficam guardados aqui em um arquivo escondido no seu profile
+
+	> cat ~/.kube/config
+
+	Obs.: Não use User Accounts para autenticar, conselho do curso
+
+
+
+
+	
+- Applications
+
+	Tudo acontece em PODs, Kubernetes associa cada POD com um com algo como Sercice Account (Managed inside Kubernetes)
+	e esse Service Account é usado como Authorization and Authentication activities em um Kubernetes Cluster.
+
+
+	Tudo que acontece em kubernetes passa pela API e está disponivel pelo HTTP endpoit e a camada OSI kubectl e  tudo processando em 
+	Apps ou servicos em POD, tudo passa pela API Server
+
+	Podemos checar o API Server
+
+	>  kubectl cluster-info
+		Kubernetes master is running at https://kubernetes.docker.internal:6443
+		KubeDNS is running at https://kubernetes.docker.internal:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+		To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+
+
+	Dentro da pasta de profile tem o arquivo config que guarda os certificados do kebernetes,
+	cada comando Kubectl get pod, por exemplo, manda o comando para a API Server que checa
+	os certificados locais mandados para ela
+
+	> kubectl get pod ---------> API
+
+					AuthN = Autentica o pedido e verifica se o usuario
+					      	é quem diz ser e passa o nome do usuario
+						para o autorization plugin
+
+					AuthZ = Apos o usuario ser autenticado, verifica
+						se o usuario tem permissão de realizar o 
+						comando
+					
+
+	O mesmo processo ocorre quando o POD manda um request para a API Server
+
+						Request
+				 API <------------------------------- POD
+			
+					AuthN 
+
+					AuthZ 
+
+
+
+
+
+SERVICE ACCOUNT
+--------------------------------------------------------------------------------------
+
+Vendo o contexto local
+
+	> kubectl confi current-context
+
+	docker-desktop
+
+
+Checando PODs 
+
+	> kubectl get pods
+	> kubectl get pod vpnkit-controller -o yaml -n kube-system | grep serviceAccountName:
+
+        f:serviceAccountName: {}                                                                                          
+	serviceAccountName: vpnkit-controller  			---> vpnkit-controller é o nome do Service Account que este POD usa
+
+
+Não não especificamos o Service Account e o Kubernete especifica automaticamento por nós
+
+Todas as vezes que fazemos o deploy de um POD o kubernetes pega o service account que está definido para uma namespace
+na qual o POD foi criado
+
+Cada Namaspace ganha automaticamente um Service Account
+
+Essa app vai ser criado na namespace default e vai pegar o service account default, simples assim.
+
+pod.yaml
+----------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: k8s-api
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+  - name: app
+    image: nginx
+
+
+vendo os service account
+
+	> kubectl get sa --all-namespaces
+
+		NAMESPACE         NAME                                 SECRETS   AGE
+		default           default                              1         3d1h
+		kube-node-lease   default                              1         3d1h
+		kube-public       default                              1         3d1h
+		kube-system       attachdetach-controller              1         3d1h
+		kube-system       bootstrap-signer                     1         3d1h
+		kube-system       certificate-controller               1         3d1h
+		kube-system       clusterrole-aggregation-controller   1         3d1h
+		kube-system       coredns                              1         3d1h
+		kube-system       cronjob-controller                   1         3d1h
+		kube-system       daemon-set-controller                1         3d1h
+		kube-system       default                              1         3d1h
+		kube-system       deployment-controller                1         3d1h
+		kube-system       disruption-controller                1         3d1h
+		kube-system       endpoint-controller                  1         3d1h
+		kube-system       endpointslice-controller             1         3d1h
+		kube-system       endpointslicemirroring-controller    1         3d1h
+		kube-system       expand-controller                    1         3d1h
+		kube-system       generic-garbage-collector            1         3d1h
+		kube-system       horizontal-pod-autoscaler            1         3d1h
+		kube-system       job-controller                       1         3d1h
+		kube-system       kube-proxy                           1         3d1h
+		kube-system       namespace-controller                 1         3d1h
+		kube-system       node-controller                      1         3d1h
+		kube-system       persistent-volume-binder             1         3d1h
+		kube-system       pod-garbage-collector                1         3d1h
+		kube-system       pv-protection-controller             1         3d1h
+		kube-system       pvc-protection-controller            1         3d1h
+		kube-system       replicaset-controller                1         3d1h
+		kube-system       replication-controller               1         3d1h
+		kube-system       resourcequota-controller             1         3d1h
+		kube-system       service-account-controller           1         3d1h
+		kube-system       service-controller                   1         3d1h
+		kube-system       statefulset-controller               1         3d1h
+		kube-system       storage-provisioner                  1         3d1h
+		kube-system       token-cleaner                        1         3d1h
+		kube-system       ttl-controller                       1         3d1h
+		kube-system       vpnkit-controller                    1         3d1h
+
+
+Vendo o dados do Service Account
+
+	> kubectl get sa default
+
+	Name:			default
+	Namespace:		default
+	Annotations: 		<none>
+	Image pull secretes:	<none>
+	Mountable secrets:	defaut-token-dmcf6
+	Tokens:			defaut-token-dmcf6
+	Events:			<none>
+	
+
+Vendo o secrete atraves do token defaut-token-dmcf6
+
+	> kubectl get secret defaut-token-dmcf6
+	
+	NAME			TYPE					DATA	AGE
+	default-token-dmcf6	kubernetes.io/service-account-token	3	2d19h
+
+
+
+Vendo detalhes do secret	
+
+	> kubectl describe secret defaut-token-dmcf6
+
+	Vai encontrar um uid: e token:  e outras informações
+
+	pegaando o Service account novamente e observando em yaml vamos poder enxergar esse mesmo uid do secrete nele Service Account
+
+	> kubectl get sa default -o yaml
+	.
+	.
+	.
+	metadata:
+	  .
+	  .
+	  .
+	  uid: <.....>			----> O uid está identificados
+
+
+
+Checandoo o container
+
+	> kubectl exec it k8s-api bash
+	root@k8s-api:/#  ls /var/run/secretes.io/serviceaccount/
+	
+	ca.crt		namespace	token
+
+	root@k8s-api:/#  exit
+
+
+	
+
+	
+Maountable secrets
+
+	> kubectl get sa default
+
+	Name:			default
+	Namespace:		default
+	Annotations: 		<none>
+	Image pull secretes:	<none>					---> Lista de images que pode ser montado por esse pull secrets
+	Mountable secrets:	defaut-token-dmcf6			---> Secrets que podem ser montados
+	Tokens:			defaut-token-dmcf6
+	Events:			<none>
+	
+
+
+
+Usando um Service Account para Autorizar ou Negar umservico no POD, para fazer isso precisamos configurar um RBAC (Role Based Access Control).
+
+
+rbac.yaml
+-----------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role								-----> RBAC kind		
+metadata:
+  namespace: default							-----> A namespace que possue a Service Account = Default
+  name: svc-ro
+rules:									-----> Rules Access
+- apiGroups: [""]
+  resources: ["services"]						-----> Concede acesso para apiGroup acessar services
+  verbs: ["get", "watch", "list"]					-----> permite  get, watch e list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding							----> Role Binding
+metadata:
+  name: svc-ro								----> o nome do role que vai ser ligado ao RBAC acima 
+  namespace: default							----> repete tambem a name space do Service Account
+subjects:	
+- kind: ServiceAccount							----> Service Account que vai ser ligado as permissões
+  name: "service-reader"						----> Nome do Service Account
+  namespace: default							----> Name space
+roleRef:
+  kind: Role 								---> Role que vai ser atribuido a esta Service Account 	"service-reader"
+  name: svc-ro 
+  apiGroup: rbac.authorization.k8s.io
+
+	
+
+1 - Deplot
+
+	> kubrctl apply -f rbac.yaml
+
+	> kubectl describe role svc-ro
+	
+	> kubectl get clusterrolebindings
+
+2 - Para criar um service account com os tokens e certificates
+
+	> kubectl create serviceaccount service-reader
+	> kubectl describe sa service-reader
+
+
+3 - Para deletar o Service Account
+
+
+	> kubectl delete clusterrolebinding docker-for-desktop-binding
+
+
+Um vez criado uma service account, todos os outrs acessos são bloqueados para a name space. Qualquer operação que não está no contexto 
+da service account vai ser interrompido, para testar vamos examinar este POD que testa isso
+
+pod2.yaml
+---------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sa-demo
+spec:
+  terminationGracePeriodSeconds: 1
+  serviceAccountName: service-reader			-----> Aqui ele recebe a service account criada acima quer permite get, watch e list
+  containers:						-----> Aqui temos multiplos containers
+  - name: app						
+    image: nigelpoulton/curl:1.0			----> a imagem e um simples curl
+    command: ['sh', '-c', 'sleep 9999']			-----> este app roda este sleep para manter o container ativo
+  - name: test1						----> Este é o sidecar (ambassador pattern)
+    image: nigelpoulton/k8s-api-proxy:1.0
+
+
+1 - Deploy
+
+	> kubectl apply -f sa-demo.yml
+	> kubectl get pods --watch
+
+ 
+2 - Fazendo o teste de acesso ao localhost para testar os acessos da Service Account
+
+	> kubectl exec -it sa-demo bash
+	root@sa-demo:/# 
+	root@sa-demo:/# curl localhost:8001/api/v1/namespaces/default/services/			---> Aqui vai poder acessar o kubernete service a partir daqui
+	root@sa-demo:/# 									     mas vamos perceber que alguns servicos vao ser negados
+	root@sa-demo:/# 
+
+
+
+
+
+
+
+JUNTANDO TUDO 
+
+
+
+finale-eks-disk.yaml
+--------------------------------------------------------------------------------
+kind: StorageClass									---> Storage Class
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: finale1-gcp-pd
+provisioner: kubernetes.io/aws-ebs							---> Dinamicamente vai provisionar o PVC no ebs
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  type: io1
+  iopsPerGB: "10"
+  fsType: ext4
+---
+apiVersion: v1
+kind: ServiceAccount									---> Definindo uma Service Account Reader
+metadata:
+  name: reader										---> Nome da Service Account = "Reader"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role										---> Aqui a RBAC
+metadata:
+  namespace: default
+  name: pvc-ro
+rules:
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]							---> O unico acesso que os containers la em baixo vão ter é para o PVC
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding									---> Binding a uma Reader Service Account
+metadata:
+  name: pvc-ro
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: "reader"
+  namespace: default
+roleRef:
+  kind: Role 
+  name: pvc-ro 
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: PersistentVolumeClaim								----> PVC
+metadata:
+  name: pvc-finale-1
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: finale1-gcp-pd							---> Referencia da StorageClass lá de cima
+  resources:
+    requests:
+      storage: 25Gi									---> Requerendo 25Gi
+---
+apiVersion: v1
+kind: Service										---> LoadBalancer Service
+metadata:
+  name: finale-svc
+spec:
+  selector:
+    app: finale-1
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Pod										---> Aqui são PODs definitions
+metadata:
+  name: finale-1									---> Nome do POD da App
+  labels:
+    app: finale-1									---> Label nele para parear com o LoadBalancer
+spec:
+  serviceAccountName: reader								---> Indicação para usar o Service Account "Reader" que permite listar PVCs
+  volumes:										---> Definindo volume baseado no PVC que vai ser compartilhado
+  - name: pvc-finale-1
+#    emptyDir: {}									---> ser estiver rodando local, descomentar aqui e comentar as 2 debaixo
+    persistentVolumeClaim:								---> E tambem baseado na storage classe que criamos
+      claimName: pvc-finale-1
+  securityContext:									---> Esse securityGroup aqui e porque Volumes externos bagunçam permissoes de containers e pods que vão rodar mais tarde
+    fsGroup: 0										     Aqui pode ou não ser usado dependendo da sua infra
+    runAsUser: 0
+  initContainers:									---> Aqui são 3 containers
+  - name: init-pv  # Looks for PV							---> Este primeiro é um INIT e vai checar se a PVC existe, vai ser usado por um Ambassador container
+    image: nigelpoulton/k8s-api-proxy:1.0		
+    command: ["sh", "-c"]								---> Aqui o shellscript procurando pelo PVC pv-finale-1
+    args: ["until kubectl get pvc pvc-finale-1; do echo waiting for PVC; sleep 1; done; echo PVC found!"]
+  - name: init-sync   # Does an initial sync from GH					---> Vai iniciar um sinc iniciar do git repo para um Shared Volume pvc-finale-1
+    image: k8s.gcr.io/git-sync:v3.1.5
+    volumeMounts:
+    - name: pvc-finale-1
+      mountPath: "/tmp/git"
+      readOnly: false
+    env:
+    - name: GIT_SYNC_REPO
+      value: https://github.com/nigelpoulton/ps-sidecar.git
+    - name: GIT_SYNC_BRANCH
+      value: master
+    - name: GIT_SYNC_DEPTH
+      value: "1"
+    - name: GIT_SYNC_ROOT
+      value: "/tmp/git"
+    - name: GIT_SYNC_DEST
+      value: "html"
+    - name: GIT_SYNC_ONE_TIME
+      value: "true"  
+  - name: init-svc  # Looks for Service called finale-svc
+    image: busybox									---> Este outro init vai rodar o nslooup para procurar o servico de PVC com o volume pvc-finale-1
+    command: ['sh', '-c', 'until nslookup finale-svc; do echo waiting for finale-svc service; sleep 1; done; echo Service found!']  
+  containers:
+  - name: app										---> Container App nginx
+    image: nginx
+    ports:
+      - containerPort: 80
+    volumeMounts:
+      - mountPath: "/usr/share/nginx"							--> Acessa o shared Volume pvc-finale-1
+        name: pvc-finale-1
+  - name: sidecar-sync									--> Sidecar sincroniza o repo com qualquer mudanças nele
+    image: k8s.gcr.io/git-sync:v3.1.5
+    volumeMounts:
+    - name: pvc-finale-1
+      mountPath: "/tmp"
+    env:
+    - name: GIT_SYNC_REPO
+      value: https://github.com/nigelpoulton/ps-sidecar.git
+    - name: GIT_SYNC_BRANCH
+      value: master
+    - name: GIT_SYNC_DEPTH
+      value: "1"
+    - name: GIT_SYNC_DEST
+      value: "html"
+
+
+
+1 - Deploy
+
+	> kubectl apply -f finale-eks-disk.yaml
+	> kubectl get pods --watch
+
+
+
+2 - Pegando o IP externo do loadbalancer para testar no browse
+
+	> kubectl get svc
+
+
+
+
+3 - checando os logs dos container, especialmente dos inits
+
+	> kubectl logs finale-1 -c init-pv
+	> kubectl logs finale-1 -c init-sync
+	> kubectl logs finale-1 -c init-svc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
