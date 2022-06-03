@@ -1,0 +1,361 @@
+
+
+FERRAMENTAS NATIVAS E COMUNS
+---------------------------------------------------------------------------------------
+
+	* Minikube
+
+	* Kops
+
+	* kubeadm
+
+
+- Minikuene para uso local
+
+- Kops e kubeadm para clouds e bare metal
+
+
+FERRAMENTAS PARA GERENCIAMENTO
+---------------------------------------------------------------------------------------
+
+	* Dashboard
+
+	* Kubefed
+
+	* Kompose
+
+	* Helm
+
+- Visualização e Dashboard
+
+- Large Cluster federation com kubeed
+
+- Exportação para Docker com Kompose
+
+- Large application management com Helm
+
+
+
+
+
+EXERCISE FILE -> 01_01
+------------------------------------------------------------------
+
+1) A maneira simples de criar um Cluster interativo
+
+	> kubectl run hw --image karthequian/helloworld:latest
+	deployment "hw" created
+
+
+2) Uma outra forma de criar é usando uma yaml file, vamos pegar na pasta o aquivo red.yaml
+
+	> kubectl create -f ref.yaml
+	deployment "red" created
+
+3) Verificando o deployments
+
+	> kubectl get deployments
+
+	NAME	DESIRED 	CURRENT		UP-TO-DATE	AVAILABLE	AGE
+	hw	1		1		1		1		48S
+	red	1		1		1		1		10s
+
+4) Podemos criar multiplos applications usado os yamls
+
+	> kubectl create -f blue.yaml -f gren.yaml
+	deployments "blue" created
+	deployments "green" created
+
+5) Verificando os deployments
+
+	> kubectl get deployments
+
+	NAME	DESIRED 	CURRENT		UP-TO-DATE	AVAILABLE	AGE
+	blue	1		1		1		1		13s
+	green	1		1		1		1		13s
+	hw	1		1		1		1		48S
+	red	1		1		1		1		10s
+
+6) Em alguns cenários voce pode ter uma pasta com muitos .yamls e voce pode especificar a pasta com estes yaml
+   e todos podem ser executados
+
+	> kubectl create -f ./colors
+	deployment "purple" created
+	deployment "white" created
+
+7) Verificando
+
+	> kubectl get deployments
+
+
+	NAME	DESIRED 	CURRENT		UP-TO-DATE	AVAILABLE	AGE
+	blue	1		1		1		1		3m
+	green	1		1		1		1		3m
+	hw	1		1		1		1		3n
+	purple	1		1		1		1		5m
+	red	1		1		1		1		10s
+	white	1		1		1		1		47s
+
+8) Se voce tentar criar um deploymente de uma application que ja existe vai resultar em erro
+
+	> kubectl create -f red.yaml
+
+	Error from server (AlreadyExists): error when crating "red.yaml": deployments.app "red" already exists
+
+9) A opção apply permite criar ou update application com .yaml files
+
+	> kubectl apply -f pink.yaml
+
+10) pegando mais detalhes do deployments
+
+	> kubectl get deployments -o wide
+
+	
+	NAME	DESIRED 	CURRENT		UP-TO-DATE	AVAILABLE	AGE	CONTAINERS	IMAGES				SELECTOR
+	blue	1		1		1		1		3m	blue		karthequian/helloworld:latest	app=blue
+	green	1		1		1		1		3m	green 		karthequian/helloworld:latest	app=green
+	hw	1		1		1		1		3n	hw		karthequian/helloworld:latest	app=hw
+	purple	1		1		1		1		5m	purple		karthequian/helloworld:latest	app=purple
+	red	1		1		1		1		17m	red		karthequian/helloworld:latest	app=red
+	white	1		1		1		1		13m	white		karthequian/helloworld:latest	app=white
+	pink	1		1		1		1		10m	punk		karthequian/helloworld:latest	app=punk
+
+11) Veja que há um erro no nome do container pink, podemos ajeitar o nome editando o arquivo pink.yaml e atualizar com a opção apply
+
+	> nano pink.yaml
+	> kubectl apply -f pink.yaml
+	> kubectl get deployments -o wide
+	
+	NAME	DESIRED 	CURRENT		UP-TO-DATE	AVAILABLE	AGE	CONTAINERS	IMAGES				SELECTOR
+	blue	1		1		1		1		3m	blue		karthequian/helloworld:latest	app=blue
+	green	1		1		1		1		3m	green 		karthequian/helloworld:latest	app=green
+	hw	1		1		1		1		3n	hw		karthequian/helloworld:latest	app=hw
+	purple	1		1		1		1		5m	purple		karthequian/helloworld:latest	app=purple
+	red	1		1		1		1		17m	red		karthequian/helloworld:latest	app=red
+	white	1		1		1		1		13m	white		karthequian/helloworld:latest	app=white
+	pink	1		1		1		1		10m	pink		karthequian/helloworld:latest	app=pink
+
+12) Há tambem uma outra forma de criar applications usando URL ao inves de .yaml files
+
+	> kubectl apply -f https://raw.githubusercontent.com/karthequian/kubernetesHelloworld/master/hello.yaml
+	deployment "hello-k8s-deployment" created
+
+
+
+
+
+REAL WORDL EXAMPLES
+-----------------------------------------------------------------------------------------
+
+EXERCISE FILE -> 01_02 -> Sample-infrastructure.yaml
+
+1) Rodando o arquivo com multiplos deployments
+
+	> kubectl apply -f sample-infrastructure.yaml
+	namespace "web" created
+	namespace "auth" created
+	namespace "cart" created
+	namespace "social" created
+	namespace "catalog" created
+	namespace "quote" created
+	namespace "purchasing" created
+	namespace "infra" created
+	pod "homepage-dev" created
+	pod "homepage-starting" created
+	pod "homepage-prod" created
+	pod "loggin-dev" created
+	pod "loggin-prod" created
+	pod "cart-dev" created
+	pod "cart-starting" created
+	pod "cart-prod" created
+	pod "social-dev" created
+	pod "social-starting" created
+	pod "social-prod" created
+	pod "quote-dev" created
+	pod "quote-starting" created
+	pod "ordering-dev" created
+	pod "ordering-starting" created
+	pod "ordering-prod" created
+	pod "logger" created
+	pod "monitor" created
+
+2) Quando você verificar os pods, vamos ver que não vai aparecer nada. Isso ocorre devido ao fato de que temos 
+   varias namespaces
+
+	> kubectl get pods 
+	No results found.
+
+3) Observando os namespaces
+
+	> kubectl get namespaces
+	NAME		STATUS		AGE
+	web		Active		47s
+	auth		Active		47s
+	cart		Active		47s
+	social		Active		47s
+	catalog		Active		47s
+	quote		Active		47s
+	purchasing	Active		47s
+	infra		Active		47s
+	kube-public	Active		3d
+	kube-system	Active		3ds
+	default		Active		3d
+
+	obs.: default é a namespace onde as applications são alocadas quando não se especifica um nome de namespace
+	      kube-public e kube-system são namespaces que kubernetes usa em background e é para uso exclusivo de processamento
+  	      e nao vamos fazer deploy de applications nela
+
+4) Para ver os pods em uma namespace especific podemos usar a opção -n
+
+	> kubectl get pods -n cart
+
+	NAME		READY		STATUS		RESTART		AGE
+	cart-dev	1/1		Running		0		1m
+	cart-prod	1/1		Running		0		1m
+	cart-starting	1/1		Running		0		1m
+
+5)  Para ver todos os pods de todas as namespaces usamos a opção --all-namespaces
+
+	> kubectl get pods --all-namespaces
+
+6) Podemos tambem ver de forma diferente
+
+	> kubectl get pods -o wide --all-namespaces
+
+7) As mesmas informações obtidas acima em formato wide tambem podem ser obtidas em json format
+
+	> kubectl get pods -o json --all-namespaces
+
+8) Podemos colocar em ordem por uma propriedade especifica
+
+	> kubectl get --sort-by=metadata.name --all-namespaces
+
+9) Uma pesquisa mais complexa de pods, pode ser feita atraves do path do json de retorno procurando lá somente as imagens
+   de uma label especifica (-l) e de uma namespace especifica (-n)
+
+	> kubectl get pods -o=jsonpath="{..image}" -l env=staging  -n cart
+
+	Para mais informações sobre o jsonpath podemos checar:
+	
+		https://kubernetes.io/docs/user-guide/jsonpath/
+		
+		https://kubernetes.io/docs/user-guide/kubectl-overview/
+
+
+
+EXERCISE FILE -> 01_04
+--------------------------------------------------------------------------------------------
+
+1) Apagando deployments para simples cenarios
+
+	> kubectl delete deployment hw
+
+2) Vamos checar cenarios com namespaces 
+
+	> kubectl get pods -n cart
+
+	NAME		READY		STATUS		RESTART		AGE
+	cart-dev	1/1		Running		0		1m
+	cart-prod	1/1		Running		0		1m
+	cart-starting	1/1		Running		0		1m
+
+
+3) Vamos deletar todos os pods nesse namespace especifico
+
+	> kubectl delete pods -n cart --all
+
+4) Quando checamos os pods alguns podem está em estado de terminação 
+
+
+	> kubectl get pods -n cart 
+	
+	NAME		READY		STATUS		RESTART		AGE
+	cart-dev	1/1		Terminating	0		59m
+	cart-prod	1/1		Terminating	0		59m
+	cart-starting	1/1		Terminating	0		59m
+
+
+5) Se você não quizer esperar pela deleção, o que costuma levar um tempo para ocorrer, pode usar as opções para forçar a deleção
+
+	> kubectl delete pods -n cart -all --grace-period=0 --force=0
+
+6) Tambem podemos deletar com uso de labels. O comando abaixo deleta todos os pods na namespace social (-n) com label stagin (-l)
+
+	> kubectl delete pods -l env=staging -n social
+	
+
+
+
+
+MINIKUBE ADD-ON 
+
+	https://kubernetes.io/docs/tasks/access-appliacation-cluster/web-ui-dashboard/
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
