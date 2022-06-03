@@ -1,0 +1,173 @@
+PASSOS
+------------------------------------------------------------------------------------------
+1  - Criar EKS Cluster
+		> eks create cluster --name=eksdemo1 
+				     --region=us-east-1
+				     --zones=us-east-1a, us-east-1b
+				     --without-nodegroup
+		> eks get clusters
+ 
+2   - Associar EKS Cluster a IAM OIDC(Open ID Connector) Provider
+		> eks utils associate-iam-oidc-provider --region us-east-1
+							--cluster eksdemo1
+							--approve
+2.1 - Criar Key-Pair
+		:Console->EC2->Security Groups->Key-Pair->Create Key-Pair
+			|
+			+----> kube-demo (pem)
+
+3   - Criar EKS Node Groups
+		> eks create nodegroup 	--cluster-eksdemo1
+					--region=us-east01
+					--name=eksdemo1-ng-public1
+					--node-type=t3.medium
+					--nodes=2
+					--nodes-min=2
+					--nodes-max=4
+					--node-volume-size=20
+					--ssh-access
+					--ssh-public-key=kube-demo
+					--managed
+					--asg-access
+					--external-dns-access
+					--full-ecr-access
+					--appmesh-access
+					--alb-ingess-access
+		> kubectl get nodes
+		> kubectl nodes -o wide
+
+4    - Verificar Cluster, Node Groups, EC2 Instances, IAM Polices e Node Groups
+4.1	* Verificar se cluster foi criado
+		:Console->Elastic Kubernetes Services (EKS)->Cluster
+			-> [x] eksdemo1 -> Aba Computer -> Node Groups
+			-> eksdemo1-ng-eks1 (clicar no nodegrup)
+			-> Checar as subnets, Nodes, key-pair
+
+4.2	* Verificar VPC Route Table
+		:Console->VPC->Aba Route Table->
+			Destinations		Targets
+			192.168.0.0/18		local		
+			0.0.0.0/0		ige-q0293.. (internet gateway)
+
+4.3   - Verificar Cluster, NodeGroup no EKS Management Console
+		:Console=> Elastic Kubernetes Services->eksdemo1
+		ABAS: 
+			Details
+			Compute
+				->NodeGroup: eksdemo1-ng-public1
+					ABAS
+						Details
+							-> Autoscaling Group
+							-> Subnets
+			Networking
+
+4.5   - Lista de Workers Nodes
+		> eksctl get cluster
+		> eksctl get nodegroup --cluster=eksdemo1
+		> kubectl get nodes -o wide
+		> kubectl confif view -minify	-> Ver o contex corrente
+
+4.6   - Na criação do nodegroup colocamos as seguintes Addons Flags:
+.	--asg-access		habilita IAM pol.icy para cluster-autoscale		
+	--external-dns-access	habilita IAM policy para external-dns
+	--full-ecr-access	habilita full access para ECR
+	--appmesh-access	habilita full access para AppMesh
+	--alb-ingess-access	habilita full access para alb-ingess-controller
+
+4.6.1	* Checar as IAM Policies para o Work Node EC2
+		: EC2->INSTANCES->Marcar uma
+			-> ABA Descriptio e checar em details-> IAM Role
+			--> o role é: eksctl-eksdemo1-nodegroupRole
+			----> Clicar no role e checar por polices adicionais tais como:
+			      AmazonEKSWorkNodePolicy
+			      AmazonEC2ContainerRegistryReadOnly
+			      AmazonEC2ContainerRegistryPowerUser
+			      AmazonEKS_CNI_Policy
+				eksctl-eksdemo1-nodegroup-eksdemo1-ng-public1-PolicyALBingress
+				eksctl-eksdemo1-nodegroup-eksdemo1-ng-public1-PolicyAppMesh
+				eksctl-eksdemo1-nodegroup-eksdemo1-ng-public1-PolicyAutoscale
+				eksctl-eksdemo1-nodegroup-eksdemo1-ng-public1-PolicyDNSChangeSet
+				eksctl-eksdemo1-nodegroup-eksdemo1-ng-public1-PolicyExternalDNSHostedZones
+
+4.6.3 	* Checar por Security Group Associado ao Worker Nodes
+
+		: EC2->Worker Nodes->Security Groups->
+			-> Clicar nos Security Groups que conteem "remote" no nome
+				Checar Inbound rules
+					Type		Protocol	Port	Source
+					----		----------	------	--------------	
+					SSH		TCP		22	0.0.0.0/0
+
+				Add (outro trafégo)
+					All traffic	all		all	Anywhere
+					All traffic	all		all	0.0.0.0/0 (de qualquer lugar)
+					All traffic 	all		all	:/0	  (ips dinamicos de qualquer porta)
+
+4.6.4	* Verificar CloudFormation Stacks
+		-> Checar por:
+			Control Plane Stake & Events
+			NodeGroup Stake & Events
+
+4.6.7	* Importante tambem checar NAT Gateway
+		-> Checar pelo nome 'ecks'
+
+4.6.8 	* Checar o Login no Work Node usando a Key-Pai = kube-demo
+		-> Fazer login com put ou consle
+			ssh -i kube-demo.pem ec2-user.@54.89.177.43
+
+
+
+
+
+
+
+
+
+
+
+REMOVENDO
+-------------------------------------------------
+1.		- Security Groups de cada EC2 e remover os 2 Inbound Traffic adicionais
+
+2.		- Deletar NodeGroup
+			> eksctl get nodegroup --cluster=eksdemo1
+			> eksctl delete nodegroup --cluster=eksdemo1 --name-eksdemo1-ng-publoc1
+
+		- Se houver problemas com os EBS, em cada EC2 adicionar em Role policies de EBC...
+		- Checar cloudformation o deu errado e deletar manualmente
+
+3.		- Deletar o Cluster
+			> eksctl delete cluster eksdemo1
+
+
+
+
+
+
+Zabbix Docker Containers
+---------------------------------
+https://www.youtube.com/watch?v=WYIHstLZIvg
+Available Solutions
+---------------------------------
+https://www.zabbix.com/integrations/kubernetes
+Zabbix Operator
+---------------------------------
+https://gitlab.com/frenchtoasters/zabbix-operator
+
+https://www.youtube.com/watch?v=7inJAmqyc0g&list=PL0mpo4XDX5eEPHQQWmqHEaSvjasShee_A
+https://www.youtube.com/watch?v=ScKlF0ICVYA
+https://github.com/zabbix/zabbix-docker
+https://www.zabbix.com/documentation/4.0/manual/installation/containers
+https://github.com/monitoringartist/kubernetes-zabbix
+
+
+
+
+
+
+
+
+
+
+
+
