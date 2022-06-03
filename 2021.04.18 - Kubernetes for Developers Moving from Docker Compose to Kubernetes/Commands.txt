@@ -1,0 +1,1278 @@
+
+Code Samples for this course and the others in this learning path can be found at:
+https://github.com/DanWahlin/Angular-JumpStart
+https://github.com/DanWahlin/CodeWithDanDockerServices
+https://github.com/DanWahlin/DockerAndKubernetesCourseCode
+
+
+
+Pasta de trabalho e demos
+---------------------------------------------------------------------------------
+C:\_Cursos\Projects\kubernetes\compose2kubernetes
+
+Codigo para o curso
+---------------------------------------------------------------------------------
+https://github.com/danwahlin/angular-jumpstart
+https://github.com/DanWahlin/DockerAndKubernetesCourseCode.git
+https://github.com/DanWahlin/CodeWithDanDockerServices.git
+
+
+
+
+
+Ferramenta
+
+	Docker Stack: Move o docker-compose para um yml manifest
+
+	Kompose: Open Source 
+
+Kubernetes - Alternatives
+
+	Docker Desktop
+		https://www.docker.com/productsq/docker-desktop
+	MiiKube
+		https://github.com/kubernetes/minikube
+	Kind
+		htppd://kind.sigs.k8s.io
+	Kubeeadm
+		https://kubernetes.io/docs/reference/setup-tools/kubeeadm/kubeadm
+
+
+
+Docker Compose - Overview
+---------------------------------------------------------------------------------
+
+	- A filosofia é que podemos rodar vários containers com docker run
+	  mais para rodar contaiers com serviços o docker-compose entre em cena
+
+	- Docker-compose basicamente é um arquivo .yaml que define serviços
+
+	- Quando precisamos contruir imagens num docker-compose usamos o parametro build
+	  usando os Dockerfiles desses containers
+
+	- 
+
+
+docker-compose exemple
+
+version: '3.x'							--> Iniciamos com a versão			
+  services:							-->   Definição dos serviços
+    aspnetcore							-->     Servico aspnet.core com build e network
+      build:							-->       Instrução de build Image
+	context: .						--> 	    Context .  indica o local folder
+	dockerfile: aspnetcore.dockerfile			-->         docker file aponta a imagem a ser construida
+      networks:							-->     definição da network para o serviço
+	- aspnetcoreapp-network					-->       nome da rede para os serviços
+      postgresql						-->       Segundo serviço para postgresSQL
+	image: postgres						-->         - Imagem do docker Hub
+	networks:						-->     A mesma network para os serviços conversarem
+	  - aspnetcoreapp-network				-->         O mesmo nome da rede
+      networks:							-->     A definição propriamente da rede
+	aspnetcoreapp-network					-->         Nome da rede comum
+	driver: bridge						--> 	    O tipo da rede BRIDGE
+
+
+Compose Commads
+
+	- docker-compose build
+	- docker-compose up
+	- docker-compose down
+	- docker-compose logs
+
+
+Jubernetes commands
+
+	- kubectl get all
+	- kubectl create -f resource.yml
+	- kubectl apply -f resource.ym
+	- kibectl port-foeward  [pod-name][ports]		--> Pods tem cluster IP definidos a eles, esse comando lida com esse cenario como o nome do pod e port
+
+
+Mapeando Docker Compose a Kubenetes yml files
+
+
+Do compose para kubernetes precisamos converter parte dele para os seguintes serviços
+
+Kubernetes vamos precisar definir:
+	- Deployments
+	- PODS
+	- Network
+	- Services
+
+No compose temos:
+	- Volumes
+	- Environments e outras coisas mais
+  kubernetes vamos lidar com isso com:
+	- Storage/ConfigMaps/Secretes
+
+
+Um outro ponto é que em kubernetes podemos dividir todos os Resources em arquivos menores
+
+
+Mapeando compose para kubernetes
+
+version: "3.x"
+  services:
+    node:					
+    container_name: nodeapp				---> Container, images e ports podem ficar no deployment
+    image:
+      yourAccount nodeapp
+      ports:
+        -"80:80"
+    volumes:						---> Em kubernetes há varios tipos de storages, ficaria na Seção Storage
+      -.:/var/www/logs
+    env_file						---> Environments ficaria em configMaps
+      - nodeapp.env
+    networks:						---> Network como bridge networks, ficaria em Services com Cluster IPs
+      - nodeapp network
+
+networks:						---> tambem em Services
+  nodeapp network
+    driver: bridge
+
+
+
+
+DOCKER STACK
+
+	- Feramenta que pode ser configurada no Docker Desktop para converter docker-compose em deploy kubernetes
+	  
+
+	- Comandos:
+
+		- Docker stack deploy: passa os compose e faz o deploy em swarm, em normal mode, se marcada a opção no kubernetes Desktop
+		  faz o deploy da stack em kubernetes.
+
+			> docker stack deploy -c docker-compose.yml  <nome-da-stack>
+
+		- Docker stack ls: lista os stacks deployed
+
+			> docker stack ls					=> semelhante a kubectl get all
+
+		- Docker stack ps: mostra as tasks rodando
+
+		- Docker stack rm: remove a stack
+
+			> docker stack rm <nome-da-stack>			-> equivale a docker-compose down e remoção dos containers
+
+		- Docker stack services: serviços em swarm mode
+
+		
+
+Vamos usar angula-dumpstart project
+
+
+1 - vamos usar o docker-compose.yml dessa aplicação com o processo normal
+
+	> docker-compose build .
+	> docker-compose up
+	- olhar no browse localhost:80
+	> docker-compose down
+	
+
+2 - No docker stack para fazer o deploy em kubernetes
+
+	> docker stack -c docker-compose.yml ng-angula-jumpstart
+	> docker stack ls
+		
+	--> no browse: localhost:80
+
+3 - Tirando a prova no kubernetes
+
+	> kubernetes get all
+
+4 - Removendo
+
+	> docker stack rm ng-angula-jumpstart
+
+
+
+
+
+Compose Tool
+
+	- Kompose:
+		https://kompose.io
+
+		Kompose é uma ferramenta util que ajuda usuarios
+		familiarizados com docker-compose mover para 
+		kuberntes. Ele pega um docker-compose file e 
+		traduz para um kunernetes Resources.
+
+	- O que ele faz
+					
+						    	+--------------------> Kubernetes Services
+						    	|
+		Docker-compose	----------> Kompose-----+--------------------> Kubernetes PersistentVolumeClaim
+						    	|
+						    	+--------------------> Kubernetes Deployments
+
+
+	- Instalando
+
+		# Linux
+		curl -L https://github.com/kubernetes/kompose/releases/download/v1.22.0/kompose-linux-amd64 -o kompose
+
+		# macOS
+		curl -L https://github.com/kubernetes/kompose/releases/download/v1.22.0/kompose-darwin-amd64 -o kompose
+
+		chmod +x kompose
+		sudo mv ./kompose /usr/local/bin/kompose
+
+
+	> compose --version
+	
+
+	- Kompose Commands
+
+		Kompose --help
+		Kompose -h
+
+		Kompose convert
+
+		Flags:
+
+			--file 			-> Quando o seu arquivo não é um docker-compose ou varios (mais usado)
+			--chart			-> Cria um helm chart para converter objetos
+			--json			-> se voce não tiver yaml mas uma json
+			--out			-> seleciona um diretorio de saida para os yamls
+			--replicas		-> POdemos definir o numero de replicas para o deployments dos PODs
+			--stdout		-> Imprime os objetos convertidos para stdout
+			--volumes		-> Se voce tiver volumes no seu compose ele comverte por default em um PersistentVolumeClaim
+						   ("persistentVolumeClaim"|"emptyDir"|"hostPath"|"configMap")
+						   (default "persistentVolumeClaim")
+
+
+	- --File = usado para especificar o arquivo, especialmente se o nome nao for docker-compose ou multiplos composes
+
+		> docker-compose --file docker-compose.prof.yaml
+
+		> docker-compose --files docker-compose1.yaml --file docker-compose2.yaml
+
+
+	- --stdout ou --out, voce pode usar um ou outra mas não os dois. Um vai para o console o outro pra diretorio
+
+		> konpose convert --stdout
+	
+		> kompose conver --out ./output			---> diretorio precisa existir
+
+		> kompose convert -out k8s.yaml			---> tudo para um simples arquivo
+
+
+
+
+
+
+
+
+Teste com opção --output
+
+docker-compose
+-------------------------------------------
+# Run docker-compose build
+# Run docker-compose up
+# Visit http://localhost
+# Live long and prosper
+
+version: '3.7'
+
+services:
+
+  nginx:							---> (1) Serviço NGINX
+    container_name: nginx-angular-jumpstart
+    image: nginx-angular-jumpstart
+    build:
+      context: .
+      dockerfile: .docker/nginx.dockerfile			---> Image
+    ports:							---> Port
+      - "80:80"
+      - "443:443"
+    depends_on:							---> Dependencia 
+      - node
+    networks:							---> Rede
+      - app-network
+
+  node:								---> (2) Serviço Back-end Node
+    container_name: node-service-jumpstart
+    image: node-service-jumpstart				---> Imagem
+    build:
+      context: .
+      dockerfile: .docker/node.dockerfile
+    environment:						----> Variaveis de ambiente
+      - NODE_ENV=production
+      - CONTAINER=true
+    ports:							----> Portas
+      - "8080:8080"
+    networks:
+      - app-network
+
+networks:							----> NetWork
+  app-network:
+    driver: bridge
+
+
+
+1) Rodandando o comando 
+
+	> mkdir output
+	> kompose convert --output ./output
+
+
+Arquivos Gerados:
+	nginx-service.yaml
+	node-deployment.yaml
+	app-network-networkpolicy.yaml
+	nginx-deployment.yaml
+	node-service.yaml
+
+(1) Analizando o Serviço nginx
+
+
+nginx-service.yaml
+------------------
+apiVersion: v1							
+kind: Service
+metadata:
+  annotations:							---> Observação: Sobre quem criou pode ser deletado
+    kompose.cmd: kompose convert --out ./output
+    kompose.version: 1.22.0 (955b78124)
+  creationTimestamp: null					---> Pode ser deletado
+  labels:								
+    io.kompose.service: nginx					---> O label pode ser mudado
+  name: nginx							---> Nome dado pelo container
+spec:
+  ports:
+    - name: "80"
+      port: 80
+      targetPort: 80
+    - name: "443"
+      port: 443
+      targetPort: 443
+  selector:
+    io.kompose.service: nginx
+status:
+  loadBalancer: {}						---> Aqui há uma referencia de loadbalancer
+								     mas o tipo padrão aqui é ClusterIP, pode ser apagado
+
+(2) Analizando o serviço node back-end. Note que os serviços são quase identicos
+
+node-service.yaml
+-----------------
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kompose.cmd: kompose convert --out ./output
+    kompose.version: 1.22.0 (955b78124)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: node
+  name: node
+spec:
+  ports:
+    - name: "8080"
+      port: 8080
+      targetPort: 8080
+  selector:
+    io.kompose.service: node
+status:
+  loadBalancer: {}
+
+
+( ) Aqui foi gerado um arquivo de deploymente para o servico nginx e node
+
+
+nginx-deployment.yaml
+---------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert --out ./output
+    kompose.version: 1.22.0 (955b78124)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: nginx
+  name: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: nginx
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert --out ./output
+        kompose.version: 1.22.0 (955b78124)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/app-network: "true"
+        io.kompose.service: nginx
+    spec:
+      containers:
+        - image: nginx-angular-jumpstart
+          name: nginx-angular-jumpstart
+          ports:
+            - containerPort: 80
+            - containerPort: 443
+          resources: {}
+      restartPolicy: Always
+status: {}
+
+
+( ) - Deploiment do Node
+
+node-deployment.yaml
+--------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert --out ./output
+    kompose.version: 1.22.0 (955b78124)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: node					---> O label que vai bater com o label la do serviço
+  name: node
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: node
+  strategy: {}
+  template:
+    metadata:
+      annotations:						---> Anotações que podem ser apagadas
+        kompose.cmd: kompose convert --out ./output
+        kompose.version: 1.22.0 (955b78124)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/app-network: "true"
+        io.kompose.service: node
+    spec:
+      containers:
+        - env:
+            - name: CONTAINER
+              value: "true"
+            - name: NODE_ENV
+              value: production
+          image: node-service-jumpstart
+          name: node-service-jumpstart
+          ports:
+            - containerPort: 8080
+          resources: {}
+      restartPolicy: Always
+status: {}
+
+
+
+app-network-networkpolicy.yaml
+------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  creationTimestamp: null
+  name: app-network
+spec:
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              io.kompose.network/app-network: "true"
+  podSelector:
+    matchLabels:
+      io.kompose.network/app-network: "true"
+
+
+
+Bom Algumas coisa poderiam ser simplificadas, a seguir uma versão de como ficariam as coisas modificadas:
+
+
+	nginx-service.yaml
+-------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx						----> Labels simplificadas
+spec:
+  selector:
+    app: nginx
+  type: LoadBalancer
+  ports:
+  - name: "80"
+    port: 80
+    targetPort: 80
+  - name: "443"
+    port: 443
+    targetPort: 443
+
+
+	node-service.yaml
+-------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: node
+  labels:
+    app: node
+spec:
+  selector:
+    app: node
+  type: LoadBalancer
+  ports:
+  - name: "8080"
+    port: 8080
+    targetPort: 8080
+
+
+
+	nginx-service.yaml
+-------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  selector:
+    app: nginx
+  type: LoadBalancer
+  ports:
+  - name: "80"
+    port: 80
+    targetPort: 80
+  - name: "443"
+    port: 443
+    targetPort: 443
+
+
+	node-deployment.yaml
+--------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap							---> Um config 
+metadata:
+  labels:
+    app: node-env
+  name: env-vars
+data:
+  NODE_ENV: "production"
+  CONTAINER: "true"
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: node
+  name: node
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: node
+  template:
+    metadata:
+      labels:
+        app: node
+    spec:
+      containers:
+      - env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              key: NODE_ENV
+              name: env-vars
+        - name: CONTAINER
+          valueFrom:
+            configMapKeyRef:
+              key: CONTAINER
+              name: env-vars
+        image: node-service-jumpstart
+        imagePullPolicy: IfNotPresent
+        name: node-service-jumpstart
+        ports:
+        - containerPort: 8080
+        resources: {}
+
+
+Para rodar podemos usar esta versão final que está em angular-jumpstart/k8s
+
+
+angular-jumpstart/Read.me - instruções de como rodar a aplicação
+
+angular-jumpstart/.k8s
+---------------------------
+	nginx.deployment.yml  
+	nginx.service.yml  
+	node.deployment.yml  
+	node.service.yml    
+
+1 - Construir as imagens
+	> Run docker-compose build
+
+2 - Subir os serviços
+	
+	> kubectl apply -f .ks8
+
+	> Run docker-compose up			----> Com compose
+	
+3 - Ver setrviço no browse
+
+	http://localhost
+
+
+
+
+SKAFFOLD TOOL
+--------------------------------------------------
+
+	Skaffold cuida de todo o workflow para construir sua applicação, publica
+	e faz o deploy da sua aplicação, permitindo você se focar que mais importa
+	escrever o código.
+
+https://skaffold.dev
+
+
+Processo:
+	Vamos ter 2 agentes para 1 resultado. Os 2 primeiros são exatamente o compose 
+	e o segundo um arquivo skaffold init, e o resultado o nosso yaml de guerra
+
+	
+		docker-compose.yml -----> skafolld init ------> yaml
+
+
+	skaffold init : - vai auxiliar na conversão com parametros
+			- Monitora o local code para mudanaças
+			- lida com o deployment inclusive com o container 
+
+
+skaffold init exemplo:
+--------------------------
+apiVersion: skaffold 					<--- Skaffold version
+  kind: Config
+  metadata:
+    name: skaffold jumpstart
+  build:
+    artifacts:						<---- Peoject artifacts to watch for changes
+    - image: nginx jumpstart
+    context: .
+    docker:
+      dockerfile: Dockerfile				<---- Docker location for building image
+  deploy:
+    kubectl:
+      manifests:					<---- Location of Kubernetes files
+      - .k8s/*.yml
+
+
+
+
+	- Skaffold Pipeline Stages
+
+		https://scaffold.dev/docs/pipeline-stages
+
+	Detect Souce Code Changes  -> Build Artifacts -> Test Artifacts -> Tag artifacts -> Render artifacts -> Deploy manifests -> Tail logs & forward ports
+		|																|
+		|																|
+	    File Sync														  Cleanup images and resouces
+
+
+
+Instalando Skaffold
+
+
+	https://skaffold.dev/docs/install/
+
+	curl -Lo skaffold https://storage.googleapis.com/skaffold/builds/latest/skaffold-linux-arm64 
+
+	install skaffold /usr/local/bin/
+
+
+skaffold Commands
+
+	Para fazer a configuração inicial do projeto para deploy em kubernetes
+
+		> skaffold init	
+
+	Baseando a configuração em um Docker Compose File
+
+		> skaffold init --compose-file docker-compose.yaml
+
+
+	Se voce ja tem um arquivo yaml em kubernetes
+
+		> skaffold init -k .k8s/*.yml
+
+
+
+	Definindo os Build Artifacts
+
+	--artifact ou -a : pode ser usado para definir build artifacts tais como o local do seu Dockerfiles.
+
+	
+		> skaffold init --compose-file  docker-compose.yaml  
+				-a '{"builder":"Docker", 
+   				     "payload":{"builder":"Docker", 
+						"payload":{"path":"./nginx.dev.dockerfile"},
+						"image":"nginx-jumpstart"}'
+
+
+
+	skaffold dev : Rodda um build/development pipeline no modo development 
+		       Faz uma trigger par olhar um loop build e fazer o deploy do workflow
+
+		> skaffold dev
+
+
+	skaffold run : Roda o comando e faz o deploy do projeto uma unica vez
+
+	
+		> skaffold run
+
+
+	
+Exemplo:
+-------------------------------------------------------------------------
+
+version: "3.7"
+ 
+services:
+    nginx:
+      container_name: nginx
+      image: ${DOCKER_ACCT}/nginx
+      build: 
+        context: .
+        dockerfile: .docker/nginx.${APP_ENV}.dockerfile
+      # links are deprecated (networks are used instead for communication and 
+      # depends_on for upstream node name in nginx config)
+      # links:
+      #   - node1:node1
+      #   - node2:node2
+      #   - node3:node3
+      depends_on: 
+        - node
+      ports:
+        - "80:80"
+        - "443:443"
+      networks:
+        - codewithdan-network
+        
+    node:
+      container_name: node-codewithdan
+      image: ${DOCKER_ACCT}/node-codewithdan
+      build: 
+        context: .
+        dockerfile: .docker/node-codewithdan.${APP_ENV}.dockerfile
+      ports:
+      - "8080"
+      volumes:
+        - .:/var/www/codewithdan
+      working_dir: /var/www/codewithdan
+      env_file:
+        - ./.docker/env/app.${APP_ENV}.env
+      depends_on:
+        - mongo
+        - redis
+      networks:
+        - codewithdan-network
+      
+    # Removing these for those wanting to run Kubernetes as well (since replica sets would scale pods with containers)
+    # node2:
+    #   container_name: node-codewithdan-2
+    #   image: ${DOCKER_ACCT}/node-codewithdan
+    #   build: 
+    #     context: .
+    #     dockerfile: .docker/node-codewithdan.${APP_ENV}.dockerfile
+    #   ports:
+    #   - "8080"
+    #   volumes:
+    #     - .:/var/www/codewithdan
+    #   working_dir: /var/www/codewithdan
+    #   env_file:
+    #     - ./.docker/env/app.${APP_ENV}.env
+    #   depends_on:
+    #     - mongo
+    #     - redis
+    #   networks:
+    #     - codewithdan-network
+      
+    # node3:
+    #   container_name: node-codewithdan-3
+    #   image: ${DOCKER_ACCT}/node-codewithdan
+    #   build: 
+    #     context: .
+    #     dockerfile: .docker/node-codewithdan.${APP_ENV}.dockerfile
+    #   ports:
+    #   - "8080"
+    #   volumes:
+    #     - .:/var/www/codewithdan
+    #   working_dir: /var/www/codewithdan
+    #   env_file:
+    #     - ./.docker/env/app.${APP_ENV}.env
+    #   depends_on:
+    #     - mongo
+    #     - redis
+    #   networks:
+    #     - codewithdan-network
+      
+    mongo:
+      container_name: mongo
+      image: ${DOCKER_ACCT}/mongo
+      build:
+        context: .
+        dockerfile: .docker/mongo.dockerfile
+      ports:
+      - "27017:27017"
+      env_file:
+        - ./.docker/env/mongo.${APP_ENV}.env
+      networks:
+        - codewithdan-network
+        
+    redis:
+      container_name: redis
+      image: ${DOCKER_ACCT}/redis
+      build: 
+        context: .
+        dockerfile: .docker/redis.${APP_ENV}.dockerfile
+      ports:
+        - "6379"
+      networks:
+        - codewithdan-network
+
+    # cadvisor:
+    #   container_name: cadvisor
+    #   image: google/cadvisor
+    #   volumes:
+    #     - /:/rootfs:ro
+    #     - /var/run:/var/run:rw
+    #     - /sys:/sys:ro
+    #     - /var/lib/docker/:/var/lib/docker:ro
+    #   ports:
+    #     - "8080:8080"
+    #   networks:
+    #     - codewithdan-network
+        
+networks:
+    codewithdan-network:
+      driver: bridge
+	
+
+
+
+
+1 - Vamos pegar o compose file e gerar uma arquivo skaffol.yaml, no caso skaffold.yaml
+
+	
+	> skaffold init --compose-file docker-compose.yml -f skaffold.yaml 
+				-a '{"builder":"Docker", 
+   				     "payload":{"payload":{"path":".docker/nginx.dockerfile"},
+						"image":"nginx-angular-jumpstart"}'
+				-a '{"builder":"Docker", 
+   				     "payload":{"payload":{"path":".docker/nginx.dockerfile"},
+						"image":"nginx-service-jumpstart"}'
+
+
+2 - Arquivo gerado, que vai servir se guiar caso hajaalguma mudança no source code
+
+skaffold.yaml
+--------------------------------------------
+apiVersion: skaffold/v2beta4
+kind: Config
+metadata:
+  name: angular-jumpstart
+build:
+  artifacts:
+  - image: nginx-angular-jumpstart								---> Inicialmente a imagem para buildada
+    context: .											---> pasta inicial
+    sync: 											---> aqui é um truque que podemos adicionar para sicronizar todo o codigo e rebuild o codigo em uma imagem de produção
+      # A local build will update dist and sync it to the container
+      manual:											---> ver associação disso no dockerfile abaixo
+      - src: "./dist"										---> Aqui a pasta local
+        dest: "/usr/share/nginx/html"								---> Aqui a pasta destino que recebe a copia da local
+    docker:
+      dockerfile: .docker/nginx.dev.dockerfile							--># Referencing a dev version of the Dockerfile so that the speed is better
+  - image: node-service-jumpstart								   # Will build app locally which is then copied into the image
+    context: .											   # Much faster than doing a multi-stage build as you would for production
+    docker:
+      dockerfile: .docker/node.dockerfile
+deploy:
+  kubectl:
+    manifests:
+    - .k8s/*.yml										--> Pasta destino
+
+
+angular.docker/nginx.dev.dockerfile
+----------------------------------------------------------------
+FROM nginx:alpine
+VOLUME /var/cache/nginx
+COPY ./dist /usr/share/nginx/html								---> A pasta local para a build do nginx
+COPY ./.docker/config/nginx.conf /etc/nginx/conf.d/default.conf
+
+# docker build -t nginx-angular -f nginx.dockerfile .
+# docker run -p 80:80 nginx-angular
+
+
+
+3 - Podemos usar agora o parametro run para rodar e fazer o deploy uma unica ves e dev para rodar toda vez que o codigo fonte muda
+    Abaixo as imagens vao ser buildadas e deployed
+
+	> skaffold dev skaffoldtest.yaml
+
+
+4 - Vamos fazer o build do codigo em Angular,--watch mostra as mudanças no html e builda tudo na past dist que é a pasta que vamos fazer o sinc
+
+	> ng build --watch
+      
+      
+5 - Vamos rodar a sincronização
+
+
+	> skaffold dev -f skaffold.yaml
+
+
+
+USANDO DOCKER STACK
+-----------------------------------------------------------------
+
+EXPLORANDO /CodeWithDockerServer
+================================
+
+Vamos examinar o seguinte composer
+
+    # 1. Update config values (localhost --> mongo and localhost --> redis) in config/config.development.json if necessary.
+    # 2. Set APP_ENV environment variable by running the following command in your commnand window (see the notes below if on Windows). 
+
+    #    export APP_ENV=development or export APP_ENV=production
+    #    export DOCKER_ACCT=codewithdan
+
+    #    NOTE: If you're on Windows use one of the following commands to create the environment variables. 
+    #    Use 'codewithdan' for the account if you want to run in Kubernetes (see the readme). Otherwise, you can substitute your own 
+    #    Docker account for the value if you'd like.
+
+    #    For the standard Windows DOS command shell use `set` instead of `export` for environment variables.
+    #    For Windows Powershell use `$env:APP_ENV = "value"`.
+    
+    # 3. Remove "node" service `volume` (below) if doing a production build
+    # 4. Run docker-compose build
+    # 5. Run docker-compose up
+    # 6. Live long and prosper
+
+version: "3.7"
+ 
+services:
+    nginx:
+      container_name: nginx
+      image: ${DOCKER_ACCT}/nginx
+      build: 
+        context: .
+        dockerfile: .docker/nginx.${APP_ENV}.dockerfile
+      # links are deprecated (networks are used instead for communication and 
+      # depends_on for upstream node name in nginx config)
+      # links:
+      #   - node1:node1
+      #   - node2:node2
+      #   - node3:node3
+      depends_on: 
+        - node
+      ports:									---> O nginx está na porta 80, o entrypoint para o este web app
+        - "80:80"
+        - "443:443"
+      networks:
+        - codewithdan-network
+        
+    node:									---> Este serviço vai chamar o serviço acima, mas, não vai acessar diretamente e sim pelo proxy reverso do nginx ou pelo foward dynamic request
+      container_name: node-codewithdan
+      image: ${DOCKER_ACCT}/node-codewithdan
+      build: 
+        context: .
+        dockerfile: .docker/node-codewithdan.${APP_ENV}.dockerfile
+      ports:
+      - "8080"
+      #volumes:									---> Na produção vamos remover o volume
+      #  - .:/var/www/codewithdan
+      working_dir: /var/www/codewithdan
+      env_file:
+        - ./.docker/env/app.${APP_ENV}.env
+      depends_on:
+        - mongo
+        - redis
+      networks:
+        - codewithdan-network
+      
+    # Removing these for those wanting to run Kubernetes as well (since replica sets would scale pods with containers)
+    # node2:
+    #   container_name: node-codewithdan-2
+    #   image: ${DOCKER_ACCT}/node-codewithdan
+    #   build: 
+    #     context: .
+    #     dockerfile: .docker/node-codewithdan.${APP_ENV}.dockerfile
+    #   ports:
+    #   - "8080"
+    #   volumes:
+    #     - .:/var/www/codewithdan
+    #   working_dir: /var/www/codewithdan
+    #   env_file:
+    #     - ./.docker/env/app.${APP_ENV}.env
+    #   depends_on:
+    #     - mongo
+    #     - redis
+    #   networks:
+    #     - codewithdan-network
+      
+    # node3:
+    #   container_name: node-codewithdan-3
+    #   image: ${DOCKER_ACCT}/node-codewithdan
+    #   build: 
+    #     context: .
+    #     dockerfile: .docker/node-codewithdan.${APP_ENV}.dockerfile
+    #   ports:
+    #   - "8080"
+    #   volumes:
+    #     - .:/var/www/codewithdan
+    #   working_dir: /var/www/codewithdan
+    #   env_file:
+    #     - ./.docker/env/app.${APP_ENV}.env
+    #   depends_on:
+    #     - mongo
+    #     - redis
+    #   networks:
+    #     - codewithdan-network
+      
+    mongo:								---> Aqui um serviço MongoDB
+      container_name: mongo
+      image: ${DOCKER_ACCT}/mongo					---> Lê direto da variavel de ambienete, isso permite um unico compose para diferente cenários
+      build:
+        context: .
+        dockerfile: .docker/mongo.dockerfile
+      ports:
+      - "27017:27017"
+      env_file:	
+        - ./.docker/env/mongo.${APP_ENV}.env				---> Lê o ambiente direto da variavel de ambienete
+      networks:
+        - codewithdan-network
+        
+    redis:								---> Redis Cache Server
+      container_name: redis
+      image: ${DOCKER_ACCT}/redis
+      build: 
+        context: .
+        dockerfile: .docker/redis.${APP_ENV}.dockerfile			---> Lê o ambiente direto da variavel de ambienete
+      ports:
+        - "6379"
+      networks:
+        - codewithdan-network
+
+    # cadvisor:								--> NO Lixux ou mac temos esse adviser
+    #   container_name: cadvisor
+    #   image: google/cadvisor
+    #   volumes:
+    #     - /:/rootfs:ro
+    #     - /var/run:/var/run:rw
+    #     - /sys:/sys:ro
+    #     - /var/lib/docker/:/var/lib/docker:ro
+    #   ports:
+    #     - "8080:8080"
+    #   networks:
+    #     - codewithdan-network
+        
+networks:
+    codewithdan-network:
+      driver: bridge
+
+
+
+
+1 - Para rodar esse compose temos que seguir as instruções que vem no topo
+    a primeira é disparar as variaveis de ambiente
+
+    	> export APP_ENV=development 						---> or export APP_ENV=production
+    	> export DOCKER_ACCT=codewithdan
+
+2 - Setar o Environment
+
+	> $env:APP_ENV = "production"`.
+	> $env:DOCKER_ENV = "codewith"`.
+
+
+
+3 - Após feita as mudaças no compose e setadas as variaveis de ambiente, podemos buildar
+
+	> docker-compose build .
+
+4 - Rodar localmente para testar as imagens
+
+	> docker-compose up
+
+	_--> no bowse: localhost:80
+
+	> docker-compose down
+
+
+5 - Fazendo o deploy em kubernetes Desktop, vamos usar docker stack que vai fazer todos as conversões em background para kubernetes
+    será criada uma stack que se responsabiliza por toda essa conversão com o nome codewithdan
+
+	> docker stack deploy -c docker-compose.yml codewithdan
+
+	nginx: Ready
+	mongo: Ready
+	node: Ready
+	redis: Ready
+
+
+6 - Para confirmar podemos averiguar no kubernetes se o docker stack criou tudo
+
+
+	> kubectl get pods
+
+7 - Testando no browse
+
+	localhost:80
+
+8 - Para remover a stack, que tambem remove toda infra do kubernetes
+
+	> docker stack codewithdan
+
+
+
+
+
+
+
+CONVERTENDO O COMPOSE ACIMA PARA KUBERETES COM KOMPOSE
+----------------------------------------------------------
+
+
+/codewithdandockerservices
+
+1 - Da mesma forma anterior vamos setar as variáveis, desta vez demonstrado em PowerShell
+
+	> $env:APP_ENV="production"
+	> $env:DOCKER_ACCT="codewithdan"
+
+
+2 - Convertendo
+
+
+	> kmpose convert -f docker-compose.yml -o ./output
+		INFO Network codewithdan-network is detected at Source, shall be converted to equivalent NetworkPolicy at Destination
+		INFO Network codewithdan-network is detected at Source, shall be converted to equivalent NetworkPolicy at Destination
+		WARN Volume mount on the host "/mnt/c/_cursos/projects/kubernetes/compose2kubernetes/CodeWithDanDockerServices" isn't supported - ignoring path on the host
+		INFO Network codewithdan-network is detected at Source, shall be converted to equivalent NetworkPolicy at Destination
+		INFO Network codewithdan-network is detected at Source, shall be converted to equivalent NetworkPolicy at Destination
+		INFO Kubernetes file "output/mongo-service.yaml" created
+		INFO Kubernetes file "output/nginx-service.yaml" created
+		INFO Kubernetes file "output/node-service.yaml" created
+		INFO Kubernetes file "output/redis-service.yaml" created
+		INFO Kubernetes file "output/mongo-deployment.yaml" created
+		INFO Kubernetes file "output/docker-env-mongo-development-env-configmap.yaml" created
+		INFO Kubernetes file "output/codewithdan-network-networkpolicy.yaml" created
+		INFO Kubernetes file "output/nginx-deployment.yaml" created
+		INFO Kubernetes file "output/node-deployment.yaml" created
+		INFO Kubernetes file "output/docker-env-app-development-env-configmap.yaml" created
+		INFO Kubernetes file "output/node-claim0-persistentvolumeclaim.yaml" created
+		INFO Kubernetes file "output/redis-deployment.yaml" created
+
+
+3 - Comparar as modificações com a a pasta .k8s
+
+4 - Rodando
+
+	> kubernetes apply -f .k8s
+
+5 - Deletado o serviço
+
+	> kubectl delete -f .k8s
+
+
+
+
+
+
+FAZENDO  O PROCESSO COM SKAFFOLD
+-----------------------------------------------------------------
+
+1 - No mesmo projeto poderiamos rodar o comando incial para gerar o skaffold.yml
+
+	> skaffold init  --compose-file docker-compose.yml -f skaffold.yaml 
+
+2 - Uma outra opção é usar o que ja temos namesma pasta do projeto
+
+
+skaffold.yml
+---------------------------------------------------------------------------------------
+apiVersion: skaffold/v2beta4
+kind: Config
+metadata:
+  name: codewithdan-docker-services
+build:
+  artifacts:									--> Aqui há 4 imagens para ser criada
+  - image: codewithdan/nginx							--> imagem codewithdan/nginx
+    context: .
+    docker:
+      dockerfile: .docker/nginx.production.dockerfile
+  - image: codewithdan/node-codewithdan						--> imagem codewithdan/node-codewithdan		
+    context: .
+    docker:
+      dockerfile: .docker/node-codewithdan.production.dockerfile
+  - image: codewithdan/mongo							--> imagem codewithdan/mongo
+    context: .
+    docker:
+      dockerfile: .docker/mongo.dockerfile
+  - image: codewithdan/redis							--> imagem codewithdan/redis
+    context: .
+    docker:
+      dockerfile: .docker/redis.production.dockerfile
+deploy:
+  kubectl:
+    manifests:									---> O manifesto foi mudado para 
+    - .k8s/*.yml
+
+
+1 - Na pasta .Docker tem todos os built scripts para examinar
+
+
+2 - Antes de prosseguir com o deploy em kubernetes, tem um secret em mongo que precisa ser criado
+
+	> kubernetes create secret genetic db-passwords --from-literal-db-password='password' -from-literal=db-root-password='password'
+
+
+3 - executando o deploy com skaffold, ele vai achar os dockerfiles e executar um build em todos, 
+    isso é descoberto pelo proprio yml atraves das imagens.
+
+	> skaffold dev 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
