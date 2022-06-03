@@ -1,0 +1,252 @@
+f
+
+
+DEPLOYMENT
+
+Formas de como schedule o container no POD em um Worker Node
+
+file.deployment.yml
+---------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: my-nginx
+    tier: frontend
+  spec:
+    selector:
+      matchLabels:
+        tier: frontend
+    template:
+      metadata:
+        labels:
+          tier: frontend
+      spec:
+        containers: 
+        - name: my-nginx
+          image: nginx:alpine
+---------------------------
+
+
+1) com kubectl, "--save-config" é uma instrução para salvar as configurações que podem ser mudadas depois
+
+	> kubectl create -f file.feployment.yml --save-config
+
+2) Criando ou modificando com Apply
+	
+	> kubectl apply -f file.deployment.yml
+
+3) Com skale
+	
+	> kubectl scale deployment <deployment-name>  --replicas=5
+
+	> kubectl scale -f file.deployment.yml  --replicas=5
+
+
+
+
+
+
+
+
+DEPLOYMENT ROLLING UPDATE
+------------------------------------------------------------------------------------------
+	- Allow Deployments Updates to take place with zero downtime by 
+	  incrementally updating Pods instances with new ones.
+
+	- ReplicasSets increase new Pods while decresing old Pods.
+	
+	- Service handles load balancing traffic to available Pods 
+	
+	- New Pods only schedule on available Nodes
+
+	- Deployments supports two strategy options: 
+		- Rolling Update (default and our focus here)
+		- Recreate (can result in down-time)
+
+
+file.deployment.yml
+-------------------------------
+apiVersion: apps/v1 
+kind: Deployment 
+metadata: 
+  name: frontend 
+spec: 
+  replicas: 2 				--> Número de replicas de Pods
+  minReadySeconds: 1 			--> Numero de segundos que um novo Pod pode ser considerado saldavel(0)
+  progressDeadlineSeconds: 60 		--> Numero de segundo que deve-se esperar para reportar um Pod parado
+  revisionHistoryLimit: 5 		--> Numero de replicas que podem ser roll back (10)
+  strategy: 				--> Tipo de deploymente RollingUpdate (default) ou Recreate Strategy
+    type: RollingUpdate 
+    rollingUpdate: 
+      maxSurge: 1 			--> Pods máximo que podem exceder a contagem de replicas (25%)
+      maxUnavailable: 1			--> Pods máximo que não são operacionais (25%)
+...
+-------------------------------
+
+1) Criando o deployment, "--record" sava o config do deployment revision history.
+
+	> kubectl create -f file.deployment.yml --save-config --record
+
+2) Criando e modificando o Deployment
+
+	> kubectl apply -f file.deployment.yml --record	 
+
+3) Pegando informações sobre o Deployment
+
+	> kubectl rollout status deployment [deployment-name]
+
+
+
+
+
+ROLLING BACK DEPLOYMENT
+---------------------------------------------------------
+
+
+	- Checando o History do Deployment:
+	  comando: kubectl rollout history 
+		   Este comando pode ser usado para ver o historico de um Deployment
+
+1) Pega informações sobre o Deployment
+
+	> lubectl rollout history deployment [deployment-name]
+	> kubectl rollout history deployment [deployment-name] --revision=2
+
+2) Checando Status
+
+	> kubectl rollout status -f file.deployment.yml
+
+3) Rollback a deployment
+
+	> kubectl rollout undo -f file.deployment.yml
+
+4) Rollback to a specific revision
+
+	> kubectl rollout undo deployment [deployment-name] --to-revision=2
+
+
+	
+
+
+
+CANARY DEPLOYMENT
+-------------------------------------------------------------
+
+
+- Definindo o Serviço para a associar o Deployment e o Canary 
+
+---------------------------------------------
+kind: Service 
+apiVersion: v1 
+metadata: 
+  name: stable-service 
+  labels:
+    app: aspnetcore
+  spec: 
+    type: LoadBalancer 
+    selector:
+      app: aspnetcore			---> Pod Label to select for Service
+    ports:
+      - port: 80 
+        targetPort: 8
+
+
+
+DEFININDO UM STABLE DEPLOYMENT
+-----------------------------------------------------
+apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: stable-deployment
+  spec:
+    replicas: 4
+    selector:
+      matchLabels:
+        app: aspnetcore
+        track: stable
+      template:
+        metadata:
+          labels: 			     (Mesma label que o serviço está appontando)
+            app: aspnetcore		---> Pod Labels (recall that app:aspnetcore is targeted by the Services)
+            track: stable
+        spec:
+          containers:
+          - name: stable-app 
+            imsage: stable-app
+
+
+Definindo um Canary Deployment
+-----------------------------------------------------
+apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: canary-deployment
+  spec: 
+    replicas: 1				---> Cria replicas Canary (25% do stable neste exemplo)
+    selector:
+      matchLabels:
+        app: aspnetcore
+        track: canary
+      template:
+        metadata: 
+          labels:			     (Mesma label que o serviço está appontando)
+            app: aspnetcore		---> Pod Labels (recall that app:aspnetcore is targeted by the service)
+            track: canary
+        spec:
+          containers:
+          - name: canary-app
+            image: canary-app
+
+
+
+1) Criando o Stable e o Canary Resources, lembrando que é igual a qualquer deploymente comuns. Mas o label
+   tem que bater em todos os deployments
+
+	Obs: podemos usar o kubectl create ou kubectl aplly para criar o serviço, 
+             Stable Deployment e o Canery Deployment
+
+	kubectl create -f [folder-name] --save-config --record
+
+2) Fazendo o deploy da pasta de exercicios "canary"
+
+	2.1) Fazendo o deploy
+		
+		> kubectl -f canary.deployment.yml 
+		> kubectl ger pods
+		> kubectl delete -f stable.deployment.yml		--> uma vez pronto vamos deletar o stable
+
+
+
+
+
+
+
+BLUE GREEN DEPLOYMENT
+-----------------------------------------------------
+
+	- Strategy for checking the viability of a deployment before it's publicly available
+
+	- Run two identical production enviroments at the same time
+
+	- New application (green) is deployed alongside the old application (blue)
+
+	- Traffic routed from blue to green when check pass
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+

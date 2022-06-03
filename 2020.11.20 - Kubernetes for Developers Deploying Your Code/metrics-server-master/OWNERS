@@ -1,0 +1,12 @@
+# See the OWNERS docs: https://go.k8s.io/owners
+owners:
+- s-urbaniak
+- brancz
+- serathius
+approvers:
+- metrics-server-approvers
+reviewers:
+- metrics-server-approvers
+- metrics-server-reviewers
+emeritus_approvers:
+- piosz
