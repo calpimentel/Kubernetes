@@ -1,0 +1,117 @@
+
+
+AMAZON AWS EKS COM EC2
+---------------------------------------------------------
+
+1) Criar o repositorio
+
+	> aws ecr create-repository --repository-name demo
+
+2) Logar no repositorio, o output deste comando vai ser outro comando que podemos copiar e colar. 
+   em um linha de comando para logar.
+
+	> aws ect get-login --region us-east-1 --no-include-email
+	
+3) V vamos precisar montar o nosso registry e as seguintes informações são necessárias
+
+	<registryId>.dkr.ecr.<region>.amazonaws.com/<image-name>:<tag>
+
+	<registryId>		= Id retornado da criação do repositorio
+	<region>		= Região onde o repositório foi criado
+	<image-name>		= Nome da imagem que vai ser de escolha livre
+	<tag>			= também de escolha do usuário
+			
+4) Após colhidas as informações do repositorio, vamos criar a imagem. O ponto no final indica 
+   que o diretorio para a criação fica no diretório corrente.
+
+	> docker build -t 481978552537.dkr.ecr.us-east-1.amazonaws.com/demo:1.0 .
+
+5) Podemos tambem usar o comando docker tag no mesmo formato
+
+	> docker tag 8e2036e2586 481978552537.dkr.ecr.us-east-1.amazonaws.com/demo:1.0
+
+6) Uma vez criado a tag, podemos executar push e pull direto do repositorio
+
+	> docker push 481978552537.dkr.ecr.us-east-1.amazonaws.com/demo:1.0
+
+7) Para criar o cluster:
+	Comando: 
+		eksctl create cluster
+			--name			= nome do cluster
+			--region		= regiaão
+			--zones			= Quais AZa vao ser usadas para nodes
+8) Criando o cluster
+
+	> eksctl create cluster --name demo-cluster --region us-east-1 --zones us-east-1a,us-east-1b,us-east-1d
+
+
+9) Vamos fazer o deploymente chamando demo-app com a imagem que realizamos um pushh do repositorio antes que vai está identificado como o nome completo 
+
+	> kubectl create deployment demo-app --image=481978552537.dkr.ecr.us-east-1.amazonaws.com/demo:1.0
+
+10) Vamos precisar de um serviço de loadbalancer que vai mapear e expor a applição externamente por uma porta
+
+	> kubectl expose deployment demo-app --type=LoadBalancer --port 5000 --target-port 5000
+
+11) Criando Scale para os pods
+
+	> kubectl scale deployment demo-app --replicas=3
+
+12) Para o scale dos nodes, passamos o nome do cluster --cluster=demo-cluster e numero de nodes --nodes=5, 
+    tambem o nome do node group para scale --name=ng-e56250ca
+
+	> eksctl scale nodegroup --cluster=demo-cluster --nodes=5, --name=ng-e56250ca
+
+
+13) Para atualizar a aplicação, vamos precisar de built e tagging a nova application, O exemplo coloca a nova tag 2.0 
+
+	> docker build -t 481978552537.dkr.ecr.us-east-1.amazonaws.com/demo:2.0 .
+
+14) Vamos fazer o push para para o repositorio
+
+	> docker push 481978552537.dkr.ecr.us-east-1.amazonaws.com/demo:2.0
+
+15) Um vez que a imagem está no repositorio podemos usar o kubectl para definir o atual demo image para a atualizada 2.0
+
+	> kubectl set image deployment/demo-app demo=481978552537.dkr.ecr.us-east-1.amazonaws.com/demo:2.0
+
+
+
+
+
+
+
+SERVERLESS PODs wih AWS FARGATE
+---------------------------------------------------------------------
+
+1) Criando o cluster da mesma forma que uma ec2 cluster apenas diferenciando com a opção --fargate
+
+	> eksctl create cluster --name demo-cluster --region us-east-1 --zones us-east-1a,us-east-1b,us-east-1d --fargate
+
+
+
+
+
+LIMPANDO TUDO
+---------------------------------------------------------------------
+
+1) Apagando o serviço
+
+	> kubectl delete service demo-app
+
+2) Apagando o cluster
+
+	> eksctl delete cluster --name demo-cluster
+
+3) Apagando as imagens do repositorio
+	
+	> aws ecr list-images --repository-name demo
+	> aws ecr batch-delete-image --repository-name demo --image-ids <image-id>
+
+4) Para apagar individualmente ou uma lista de imagens
+
+	> aws ecr delete-repository --repository-name demo --force
+
+
+	
+
